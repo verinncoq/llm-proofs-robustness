@@ -456,8 +456,8 @@ Qed.
 (*======================================================================*)
 (*======================================================================*)
 
-Definition nonempty_proper_subset (A : subset) : Prop :=
-  (exists x, A x) /\ (exists x, ~ A x).
+Definition nonempty_proper_subset (S' : subset) : Prop :=
+  (exists x, S' x) /\ (exists x, ~ S' x).
 
 Definition trivial_partition (p : partition) : Prop :=
   exists A, parts p = [A].
@@ -467,11 +467,11 @@ Definition compl (A : subset) : subset := fun x => ~ A x.
 
 
 Lemma nontrivial_partition:
-  forall (A : subset), nonempty_proper_subset A -> partition.
+  forall (S' : subset), nonempty_proper_subset S' -> partition.
 Proof.
-  intros A [H_in H_out].
+  intros S' [H_in H_out].
   refine {|
-    parts := [A ; compl A];
+    parts := [S' ; compl S'];
     parts_nodup    := _;
     parts_nonempty := _;
     parts_cover := _;
@@ -499,9 +499,9 @@ Proof.
     + subst A0. exact H_out.      (* A0 = complement A *)
   - (* part_cover *)
     intros x.
-    destruct (classic (A x)) as [Hx | Hx].
-    + exists A. split; [left; reflexivity | exact Hx].
-    + exists (compl A); split; [right; left; reflexivity | exact Hx].
+    destruct (classic (S' x)) as [Hx | Hx].
+    + exists S'. split; [left; reflexivity | exact Hx].
+    + exists (compl S'); split; [right; left; reflexivity | exact Hx].
   - (* part_disjoint *)
     intros A1 A2 Hin1 Hin2 Hneq x [HA1 HA2].
     simpl in Hin1, Hin2.
@@ -540,11 +540,11 @@ Qed.
 
 Lemma two_blocks_separated_is_robust
       (d   : distance_function)
-      (A   : subset)
-      (Hne : nonempty_proper_subset A)
-      (Hsep : forall x y, ~ A x -> A y ->
+      (S'   : subset)
+      (Hne : nonempty_proper_subset S')
+      (Hsep : forall x y, ~ S' x -> S' y ->
                           e < d x y /\ e < d y x) :
-  robust_partition (nontrivial_partition A Hne) d.
+  robust_partition (nontrivial_partition S' Hne) d.
 Proof.
   intros B C HB_in HC_in HBC a b Ha Hb.
   (* Eliminate the match on Hne by destructing Hne. *)
@@ -581,14 +581,14 @@ Qed.
 
 
 Lemma separation_yields_globally_robust_nontrivial :
-  forall (d : distance_function) (A : subset) (Hne : nonempty_proper_subset A),
-    (forall x y, ~ A x -> A y -> e < d x y /\ e < d y x) ->
-    let p := nontrivial_partition A Hne in
+  forall (d : distance_function) (S' : subset) (Hne : nonempty_proper_subset S'),
+    (forall x y, ~ S' x -> S' y -> e < d x y /\ e < d y x) ->
+    let p := nontrivial_partition S' Hne in
     globally_robust_partition p d /\ ~ trivial_partition p.
 Proof.
-  intros d A Hne Hfar p. split.
+  intros d S' Hne Hfar p. split.
   - apply robust_partition_implies_global,
-        two_blocks_separated_is_robust with (A:=A); assumption.
+        two_blocks_separated_is_robust; assumption.
   - intro Htriv.
     destruct Htriv as [B Hp].   (* Hp : parts p = [B] *)
     destruct Hne as [Hin Hout]. (* Destruct Hne to obtain witnesses that A is non-empty and proper. *)
@@ -601,23 +601,23 @@ Lemma global_robustness_implies_distances
   (d : distance_function):
     (forall p : partition,
         globally_robust_partition p d -> trivial_partition p) ->
-    (forall A : subset,
-      nonempty_proper_subset A ->
+    (forall S' : subset,
+      nonempty_proper_subset S' ->
       exists x y,
-        ~ A x /\ A y /\ (d x y <= e \/ d y x <= e)).
+        ~ S' x /\ S' y /\ (d x y <= e \/ d y x <= e)).
 Proof.
-  intros Hlim A Hne.
+  intros Hlim S' Hne.
 
   (* Classical case-analysis on the existence we want to prove. *)
   destruct (classic (exists x y,
-            ~ A x /\ A y /\ (d x y <= e \/ d y x <= e))) as [Hex | Hnex].
+            ~ S' x /\ S' y /\ (d x y <= e \/ d y x <= e))) as [Hex | Hnex].
   - exact Hex. (* happy branch *)
 
   - (* ¬ ∃ close pair  ⇒  build a globally robust, non-trivial partition, contradicting the premise -- thereby producing False. *)
 
     (* From ¬ ∃ close pair we get “all cross pairs are farther than ε”. *)
     assert (Hfar : forall x y,
-             ~ A x -> A y -> e < d x y /\ e < d y x).
+             ~ S' x -> S' y -> e < d x y /\ e < d y x).
     { intros x y Hnx Hay.
       split.
       - destruct (le_lt_dec (d x y) e) as [Hle|Hlt]; [| exact Hlt].
@@ -629,7 +629,7 @@ Proof.
 
     (* Lemma 3: the two-block partition is globally robust & non-trivial. *)
     destruct (separation_yields_globally_robust_nontrivial
-                d A Hne Hfar)
+                d S' Hne Hfar)
       as [Hglob Hnontriv]. (* Here p is the two-block partition defined above. *)
 
     (* The premise says every globally robust partition is trivial. *)
@@ -642,10 +642,10 @@ Qed.
 Lemma global_robustness_limit_distances
         (d : distance_function) :
   (inhabited S) ->
-    (forall A : subset,
-      nonempty_proper_subset A ->
+    (forall S' : subset,
+      nonempty_proper_subset S' ->
       exists x y,
-        ~ A x /\ A y /\ (d x y <= e \/ d y x <= e)) ->
+        ~ S' x /\ S' y /\ (d x y <= e \/ d y x <= e)) ->
   forall p : partition,
     globally_robust_partition p d ->
     trivial_partition p.
@@ -773,10 +773,10 @@ Theorem distances_limit_global_robustness (d : distance_function):
   (inhabited S) ->
     (forall p : partition,
         globally_robust_partition p d -> trivial_partition p) <->
-    (forall A : subset,
-      nonempty_proper_subset A ->
+    (forall S' : subset,
+      nonempty_proper_subset S' ->
       exists x y,
-        ~ A x /\ A y /\ (d x y <= e \/ d y x <= e)).
+        ~ S' x /\ S' y /\ (d x y <= e \/ d y x <= e)).
 Proof.
 intros *; 
 split.
@@ -1519,3 +1519,4 @@ Arguments distances_limit_global_robustness d _: assert.
 Arguments precision_gap_constraint : assert.
 
 End Paper.
+
