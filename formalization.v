@@ -1,6 +1,7 @@
 (*=================================================================================*)
 (** The following theory has been synthesized with human guidance by using ChatGPT *)
 (*=================================================================================*)
+
 From Coq Require Import Classical List Arith Lia. 
 Require Import Coq.Lists.List.
 Import ListNotations. 
@@ -13,14 +14,16 @@ Require Import Coq.Arith.PeanoNat.
 Section Paper.
 
 (*======================================================================*)
+(*======================================================================*)
 (** Section 3: Preliminaries                                            *)
 (*======================================================================*)
-
+(*======================================================================*)
 
 Context {S : Type}.
 Variable S_eq_dec : forall (x y : S), { x = y } + { x <> y }.
-Variable n : nat. (** Comment - Anzahl der Klassen *)
-Variable e : nat. (** Comment - epsilon *)
+Variable n : nat. (** Number of classes n *)
+Variable e : nat. (** Robustness radius ε (a natural number) *)
+
 
 (** Definition 1: Classifier *)
 Record classifier : Type := {
@@ -37,7 +40,6 @@ Definition class (c : classifier) (i : nat) : subset :=
 Definition classes (c : classifier) : list subset :=
   map (class c) (seq 0 n).
 
-(*---------- helper: classes are pair-wise different -------------------*)
 Lemma class_injective (c : classifier) :
   forall i j, i < n -> j < n -> class c i = class c j -> i = j.
 Proof.
@@ -46,8 +48,8 @@ Proof.
   destruct (classifier_surj c i Hi) as [x Hxi].
   (* evaluate the functional equality at that x *)
   specialize (f_equal (fun P => P x) Heq) as H.
-  rewrite <- Hxi.                     (* goal becomes [c x = j] *)
-  simpl in H.                          (* class c k x  ≡  c x = k *)
+  rewrite <- Hxi. (* goal becomes [c x = j] *)
+  simpl in H.     (* After simplification: class c i x ≡ c x = i and class c j x ≡ c x = j *)
   unfold class in H.
   rewrite H in Hxi.    (* Hxi : c x = j *)
   exact Hxi.
@@ -61,19 +63,19 @@ Lemma NoDup_map_injective
 Proof.
   intros Hndup Hinj.
   induction Hndup as [|x l Hnotin Hndup IH]; simpl.
-  - constructor.                                           (* [] case *)
-  - constructor.                                           (* x :: l case *)
+  - constructor.                  (* [] case *)
+  - constructor.                  (* x :: l case *)
     + (* prove  ~ In (f x) (map f l) *)
       intro Hin.
       apply in_map_iff in Hin as [y [Heq Hyin]].
       (* show x = y using injectivity on x :: l *)
       assert (x = y) as Hxy.
       { apply Hinj with (x:=x) (y:=y).
-        - simpl; auto.                                     (* x ∈ x::l *)
-        - right; exact Hyin.                               (* y ∈ l ⊂ x::l *)
+        - simpl; auto.            (* x ∈ x::l *)
+        - right; exact Hyin.      (* y ∈ l ⊂ x::l *)
         - symmetry; exact Heq. }
-      subst y.                                             (* replace y by x *)
-      contradiction.                                       (* Hnotin, Hyin *)
+      subst y.                    (* replace y by x *)
+      contradiction.              (* Hnotin, Hyin *)
     + (* inductive step *)
       apply IH.
       intros u v Hu Hv Hfeq.
@@ -99,7 +101,9 @@ Definition globally_robust_classifier(c : classifier) (d : distance_function) : 
 
 
 (*======================================================================*)
+(*======================================================================*)
 (** Section 4.1: Global Robustness on Classifier Induced Partitions.    *)
+(*======================================================================*)
 (*======================================================================*)
 
 (** Definition 5: Partition *)
@@ -113,7 +117,7 @@ Record partition : Type := {
 
 Lemma classes_nodup (c : classifier) : NoDup (classes c).
 Proof.
-  unfold classes.                                  (* map (class c) (seq 0 n) *)
+  unfold classes. (* map (class c) (seq 0 n) *)
   apply NoDup_map_injective.
   - (* 1) [seq 0 n] has no duplicates *)
     exact (seq_NoDup n 0).
@@ -121,8 +125,8 @@ Proof.
     intros i j Hi Hj Hmap.
     apply (class_injective c i j).
      + apply in_seq in Hi.
-      destruct Hi as [_ Hi].      (* we only need the upper bound        *)
-      simpl in Hi.                 (* 0 + n  ⟶  n                        *)
+      destruct Hi as [_ Hi].      (* we only need the upper bound *)
+      simpl in Hi.                 (* simpl turns 0 + n into n *)
       exact Hi. 
     + apply in_seq in Hj.
       destruct Hj as [_ Hj].
@@ -176,10 +180,10 @@ Proof.
   destruct HB as [j [HBj Hj_in]].
   subst A B.               (* A = class c i,  B = class c j *)
   unfold class in HAx, HBx.
-  rewrite HAx in HBx.      (* now HBx : i = j                       *)
-  subst j.                 (* replace j by i everywhere             *)
+  rewrite HAx in HBx.      (* now HBx : i = j *)
+  subst j.                 (* replace j by i everywhere *)
   apply HAB.               (* A and B have become syntactically equal *)
-  reflexivity.             (* finishes the contradiction             *)
+  reflexivity.             (* finishes the contradiction *)
 Qed.
 
 Definition induced_partition (c : classifier) : partition.
@@ -195,7 +199,7 @@ Defined.
 
 
 (*==============================================================*)
-(**            Theorem 1  (A classifier induces a partitions)   *)
+(** Theorem 1  (Classifier Induced Partition)                   *)
 (*==============================================================*)
 Theorem classifier_induces_partition (c : classifier) : partition.
 Proof.
@@ -238,7 +242,7 @@ Definition globally_robust_partition (p : partition) (d : distance_function) : P
 
 
 
-(** Theorem 2.a (->): Equivalence of Definitions - Globally Robust Classifier Induces Globally Robust Partition *)
+(** Lemma 2.a (->): Equivalence of Definitions - Globally Robust Classifier Induces Globally Robust Partition *)
 Lemma glob_rob_classifier_induces_glob_rob_partition :
   forall (c : classifier) (d : distance_function),
     globally_robust_classifier c d ->
@@ -264,7 +268,7 @@ Proof.
 Qed.
 
 
-(** Theorem 2.b (<-): Equivalence of Definitions - If Induced Partition is Globally Robust Classifier Is Globally Robust *)
+(** Lemma 2.b (<-): Equivalence of Definitions - If Induced Partition is Globally Robust Classifier Is Globally Robust *)
 Lemma induced_partition_glob_rob_then_classifier_glob_rob :
   forall (c : classifier) (d : distance_function),
     globally_robust_partition (induced_partition c) d -> globally_robust_classifier c d.
@@ -296,9 +300,8 @@ Proof.
 Qed.
 
 
-(** Theorem 2: Equivalence of Definitions - Induced Partition is Globally Robust IFF Classifier Is Globally Robust *)
 (*==============================================================*)
-(**            Theorem 2  (Equivalence of Definitions)          *)
+(** Theorem 2  (Equivalence of Definitions)                     *)
 (*==============================================================*)
 Theorem equivalence_of_definitions_classifier_partition :
   forall (c : classifier) (d : distance_function),
@@ -318,7 +321,7 @@ Definition robust_partition
     forall a b, A a -> B b -> e < d a b.
 
 (*==============================================================*)
-(**            Theorem 3  (Global Robustness is Separability)   *)
+(** Theorem 3  (Global Robustness is Separability)              *)
 (*==============================================================*)
 Theorem global_robustness_is_separability :
   forall (c : classifier) (d : distance_function),
@@ -327,8 +330,7 @@ Theorem global_robustness_is_separability :
 Proof.
   intros c d; split.
 
-  (* ------------------------------------------------------------------ *)
-  (* (→) globally-robust classifier ⇒ ε-separable induced partition      *)
+  (* (→) globally-robust classifier ⇒ ε-separable induced partition *)
   - intros Hglob.
     unfold robust_partition.
     intros A B HA HB HAB a b Ha Hb.
@@ -338,7 +340,7 @@ Proof.
     destruct (part_to_class c B HB) as [j [Hj_lt HBeq]].
     subst A B.
 
-    (* want: e < d a b  —  prove its contrapositive with Nat.nle_gt     *)
+    (* Goal: show e < d a b; we prove the contrapositive using Nat.nle_gt. *)
     apply Nat.nle_gt.                    (* goal: d a b ≤ e → False *)
     intros Hle.
 
@@ -351,8 +353,7 @@ Proof.
     (* but then the two sets are *syntactically* equal, contradicting HAB *)
     auto.
 
-  (* ------------------------------------------------------------------ *)
-  (* (←) ε-separable induced partition ⇒ globally-robust classifier     *)
+  (* (←) ε-separable induced partition ⇒ globally-robust classifier *)
   - intros Hsep x y Hdist.               (* d x y ≤ ε *)
     set (A := class c (c x)).
     set (B := class c (c y)).
@@ -363,30 +364,28 @@ Proof.
     assert (HB : In B (parts (induced_partition c)))
       by (unfold B; apply (class_to_part c (c y)), (classifier_range c y)).
 
-    (* either the labels are already equal … *)
+    (* Case 1: labels already equal, c x = c y. *)
     destruct (Nat.eq_dec (c x) (c y)) as [Heq|Hneq]; [exact Heq|].
 
-    (* … or they differ, and then the ε-separability yields a contradiction *)
+    (* Case 2: labels differ; ε-separability contradicts d x y ≤ e. *)
     exfalso.
     assert (A <> B) as HAB.
     { intro HeqAB.
       assert (B x) as Hbx by (rewrite <- HeqAB; unfold A, class; reflexivity).
       unfold B, class in Hbx. congruence. }
 
-    (* witnesses of membership needed by Hsep *)
+    (* Provide membership witnesses required for the call to Hsep. *)
     assert (Hax : A x) by (unfold A, class; reflexivity).
     assert (Hby : B y) by (unfold B, class; reflexivity).
 
     pose proof (Hsep A B HA HB HAB x y Hax Hby) as Hgt.  (* e < d x y *)
-    lia.                                 (* contradicts d x y ≤ e *)
+    lia. (* contradicts d x y ≤ e *)
 Qed.
-
 
 Definition restrict_subset (A : subset) (S0 : subset) : subset :=
   fun x => A x /\ S0 x.
 
-(* The sub-partition P∣S0 – we keep every intersection,                     *)
-(* even if it is empty; emptiness does not hurt the robustness condition.   *)
+(* Keep every intersection with S₀ (even empty ones); the robustness property only concerns points actually in S₀, so empty blocks are harmless. *)
 Definition subpartition (p : partition) (S0 : subset) : list subset :=
   map (fun A => restrict_subset A S0) (parts p).
 
@@ -399,7 +398,7 @@ Definition globally_robust_subpartition
       (forall y, S0 y -> e_ball d x y -> A y).
 
 (*==============================================================*)
-(**            Theorem 4  (Robustness of All Subpartitions)     *)
+(** Theorem 4  (Robustness of All Subpartitions)                *)
 (*==============================================================*)
 Theorem robustness_of_all_subpartitions :
   forall (p : partition) (d : distance_function),
@@ -408,7 +407,6 @@ Theorem robustness_of_all_subpartitions :
 Proof.
   intros p d; split.
 
-  (* ------------------------------------------------------------------ *)
   (* (→)  Robustness of every sub-partition ⇒ robustness of p            *)
   - intros Hsub x.
     (* Instantiate with S0 = whole universe *)
@@ -421,19 +419,18 @@ Proof.
     apply in_map_iff in HA'in_sub as [A0 [HA'eq HA0_in]].
 
     exists A0; split.
-    + exact HA0_in.                            (* membership in parts p *)
+    + exact HA0_in. (* membership in parts p *)
     + (* ε-ball around x is included in A0 *)
       intros y Hy.
       (* use the ball-inclusion we already have for A' *)
-      specialize (Hball y I Hy).               (* I : True y           *)
-      rewrite <- HA'eq in Hball.                  (* turn A' into restrict_subset … *)
+      specialize (Hball y I Hy). (* Context now contains I : True y, used to satisfy the premise True y. *)
+      rewrite <- HA'eq in Hball. (* turn A' into restrict_subset … *)
       unfold restrict_subset in Hball.
-      destruct Hball as [HA0y _].              (* keep only A0 y       *)
+      destruct Hball as [HA0y _]. (* Extract the fact A0 y and discard the S₀ component. *)
       exact HA0y.
 
-  (* ------------------------------------------------------------------ *)
-  (* (←)  Robustness of p ⇒ robustness of every sub-partition            *)
-  - intros Hglob S0 x Hx.                      (* S0 x holds           *)
+  (* (←)  Robustness of p ⇒ robustness of every sub-partition *)
+  - intros Hglob S0 x Hx. (* S0 x holds *)
     (* Global robustness gives a block A with the ε-ball *)
     specialize (Hglob x) as [A [HA_in Hball]].
 
@@ -454,7 +451,9 @@ Qed.
 
 
 (*======================================================================*)
+(*======================================================================*)
 (** Section 4.2: Existence of a Non-constant Globally Robust Classifier *)
+(*======================================================================*)
 (*======================================================================*)
 
 Definition nonempty_proper_subset (A : subset) : Prop :=
@@ -480,24 +479,24 @@ Proof.
   |}.
   - constructor.
     + (* prove   ~ In A [compl A]   i.e. A ≠ compl A *)
-      simpl. intros [Heq | []].       (* the only way is A = compl A *)
+      simpl. intros [Heq | []].   (* the only way is A = compl A *)
       subst.
-      destruct H_in  as [x  HAx].     (* A  x           *)
+      destruct H_in  as [x  HAx]. (* A x *)
       unfold compl in Heq.
       intuition.
-      pose proof HAx as Hneg.        (* mak e copy *)
-      rewrite <- Heq in Hneg.        (* Hneg : A x -> False *)
-      exact (Hneg HAx).              (* contradiction between A x and ~A x  *)
-    + (* NoDup for the singleton tail [compl A] *)
-      constructor.                    (* ~In _ [] *)
+      pose proof HAx as Hneg.     (* keep a copy of HAx as Hneg *)
+      rewrite <- Heq in Hneg.     (* Hneg : A x -> False *)
+      exact (Hneg HAx).           (* contradiction between A x and ~A x  *)
+    + (* Show the one-element list [compl A] is NoDup. *)
+      constructor.                (* ~In _ [] *)
       * simpl; tauto.
-      * constructor.                  (* NoDup [] *)
+      * constructor.              (* NoDup [] *)
   - (* part_nonempty *)
     intros A0 Hin.
-    simpl in Hin.                            (* unfold the 2-element list *)
+    simpl in Hin.                 (* unfold the 2-element list *)
     destruct Hin as [Heq | [Heq | []]].
-    + subst A0. exact H_in.                  (* A0 = A            *)
-    + subst A0. exact H_out.                 (* A0 = complement A *)
+    + subst A0. exact H_in.       (* A0 = A *)
+    + subst A0. exact H_out.      (* A0 = complement A *)
   - (* part_cover *)
     intros x.
     destruct (classic (A x)) as [Hx | Hx].
@@ -525,15 +524,15 @@ Proof.
 
   (* Case analysis on whether the two blocks are identical. *)
   destruct (classic (A = B)) as [Heq | Hneq].
-  - subst B.              (* same block ⇒ done *)
+  - subst B.
     exact HBy.
 
-  - (* Different blocks would violate ε-separability.                *)
-    (* First, obtain  e < d y x  with the right orientation.         *)
+  - (* Different blocks would violate ε-separability. *)
+    (* First, obtain  e < d y x  with the right orientation. *)
     assert (Hneq' : B <> A) by (intro H; apply Hneq; symmetry; exact H).
     specialize (Hrob B A HBparts HAparts Hneq' y x HBy HAx) as Hlt.
 
-    (* But  e_ball d x y  gives  d y x ≤ e — contradiction.          *)
+    (* But  e_ball d x y  gives  d y x ≤ e — contradiction. *)
     exfalso.
     unfold e_ball in HyBall.
     lia.
@@ -548,35 +547,35 @@ Lemma two_blocks_separated_is_robust
   robust_partition (nontrivial_partition A Hne) d.
 Proof.
   intros B C HB_in HC_in HBC a b Ha Hb.
-  (* 1️⃣  make the ‘match Hne’ disappear *)
+  (* Eliminate the match on Hne by destructing Hne. *)
   destruct Hne as [H_in_A H_out_A].
 
-  (* 2️⃣  the list is now visible *)
-  simpl in HB_in, HC_in.           (* parts …  ⟹  [A ; compl A] *)
+  (* Expose the two-element list [A ; compl A]. *)
+  simpl in HB_in, HC_in. (* parts … ⟹  [A ; compl A] *)
 
-  (* 3️⃣  case-split on which block B is *)
+  (* Case analysis: B is either A or its complement. *)
   destruct HB_in as [HB_eqA | HB_tail].
 
-  - (*── B = A ────────────────────────────────────────────────*)
+  - (* Case B = A *)
     subst B.
     destruct HC_in as [HC_eqA | HC_tail].
     + subst C.  contradiction.
     + destruct HC_tail as [HC_eqComplA | HC_nil].
       * subst C.                     (* C = ¬A *)
-        (*   Ha :      A a
-             Hb :   ¬ A b             *)
+        (* Ha :     A a *)
+        (* Hb :   ¬ A b *)
         destruct (Hsep b a Hb Ha) as [_ Hlt]. exact Hlt.
       * contradiction.
 
-    - (*── B = ¬A ───────────────────────────────────────────────*)
+    - (* Case B = ¬A *)
     destruct HB_tail as [HB_eqComplA | HB_nil]; [subst B | contradiction].
     destruct HC_in as [HC_eqA | HC_tail].
-    + subst C.                       (* C = A *)
-      (*   Ha :   ¬ A a
-           Hb :      A b             *)
+    + subst C. (* C = A *)
+      (* Ha :  ¬ A a *)
+      (* Hb :    A b *)
       destruct (Hsep a b Ha Hb) as [Hlt _]. exact Hlt.
     + destruct HC_tail as [HC_eqComplA | HC_nil]; [subst C | contradiction].
-      contradiction.                 (* B = C would violate HBC *)
+      contradiction. (* B = C would violate HBC *)
 Qed.
 
 
@@ -591,18 +590,14 @@ Proof.
   - apply robust_partition_implies_global,
         two_blocks_separated_is_robust with (A:=A); assumption.
   - intro Htriv.
-    destruct Htriv as [B Hp].          (* Hp : parts p = [B]          *)
-    destruct Hne as [Hin Hout].        (* remove the “match Hne”      *)
+    destruct Htriv as [B Hp].   (* Hp : parts p = [B] *)
+    destruct Hne as [Hin Hout]. (* Destruct Hne to obtain witnesses that A is non-empty and proper. *)
     inversion Hp; subst; simpl in *;
     discriminate.
 Qed.
 
 
-
-(*==============================================================*)
-(**            Theorem 5  (Distances Limit Global Robustness)   *)
-(*==============================================================*)
-Theorem global_robustness_implies_distances
+Lemma global_robustness_implies_distances
   (d : distance_function):
     (forall p : partition,
         globally_robust_partition p d -> trivial_partition p) ->
@@ -616,10 +611,9 @@ Proof.
   (* Classical case-analysis on the existence we want to prove. *)
   destruct (classic (exists x y,
             ~ A x /\ A y /\ (d x y <= e \/ d y x <= e))) as [Hex | Hnex].
-  - exact Hex.                                  (* happy branch *)
+  - exact Hex. (* happy branch *)
 
-  - (* ¬ ∃ close pair  ⇒  build a globally robust, non-trivial partition,
-       contradicting the premise -- thereby producing False. *)
+  - (* ¬ ∃ close pair  ⇒  build a globally robust, non-trivial partition, contradicting the premise -- thereby producing False. *)
 
     (* From ¬ ∃ close pair we get “all cross pairs are farther than ε”. *)
     assert (Hfar : forall x y,
@@ -627,16 +621,16 @@ Proof.
     { intros x y Hnx Hay.
       split.
       - destruct (le_lt_dec (d x y) e) as [Hle|Hlt]; [| exact Hlt].
-        exfalso. apply Hnex.                          (* forbidden witness *)
+        exfalso. apply Hnex. (* forbidden witness *)
         exists x, y. repeat split; try assumption; left; exact Hle.
       - destruct (le_lt_dec (d y x) e) as [Hle|Hlt]; [| exact Hlt].
-        exfalso. apply Hnex.
+        exfalso. apply Hnex. (* forbidden witness *)
         exists x, y. repeat split; try assumption; right; exact Hle. }
 
     (* Lemma 3: the two-block partition is globally robust & non-trivial. *)
     destruct (separation_yields_globally_robust_nontrivial
                 d A Hne Hfar)
-      as [Hglob Hnontriv].               (* p is implicit *)
+      as [Hglob Hnontriv]. (* Here p is the two-block partition defined above. *)
 
     (* The premise says every globally robust partition is trivial. *)
     specialize (Hlim _ Hglob) as Htriv.
@@ -645,7 +639,7 @@ Proof.
     exfalso. apply (Hnontriv Htriv).
 Qed.
 
-Theorem global_robustness_limit_distances
+Lemma global_robustness_limit_distances
         (d : distance_function) :
   (inhabited S) ->
     (forall A : subset,
@@ -659,35 +653,31 @@ Proof.
   intros Hclose Hglob p.
   destruct Hclose as [x].
   unfold trivial_partition.
-  (* We do case analysis on the list of blocks that constitutes [p].      *)
+  (* We do case analysis on the list of blocks that constitutes [p]. *)
   unfold globally_robust_partition.
   destruct (parts p) as [|A rest] eqn:Hparts.
   
-  (* ------------------------------------------------------------------ *)
-  (* Case 1: [parts p] = [] – IMPOSSIBLE                                 *)
-  (* ------------------------------------------------------------------ *)
-  -  (* Unpack the record *)
+  (* Case 1 – parts p = [] (contradicts parts_cover). *)
+  - (* Unpack the record *)
   
     destruct p as [parts_p Hnodup Hnonempty Hcover Hdisjoint].
     simpl in Hparts. rewrite Hparts in *. (* Replace parts_p with [] *)
     pose proof (Hcover x) as [A [Hin _]]. (* Apply parts_cover to x *)
     simpl in Hin. contradiction.
-  (* ------------------------------------------------------------------ *)
-  (* Case 2: nonempty parts          *)
-  (* ------------------------------------------------------------------ *)
+  (* Case 2 – parts p has at least two blocks. *)
   - destruct rest as [|B rest'].
     + exists A. reflexivity.
     + assert (HA : In A (parts p))  by (rewrite Hparts; simpl; auto).
       assert (HB : In B (parts p))  by (rewrite Hparts; simpl; auto).
-      destruct (parts_nonempty p A HA) as [a Ha].      (* a ∈ A          *)
-      destruct (parts_nonempty p B HB) as [b Hb].      (* b ∈ B          *)
+      destruct (parts_nonempty p A HA) as [a Ha]. (* a ∈ A *)
+      destruct (parts_nonempty p B HB) as [b Hb]. (* b ∈ B *)
 
       pose proof (parts_nodup p) as Hnodup.
       rewrite Hparts in Hnodup. inversion Hnodup.
 
       assert (HAB : A <> B).
       {
-        intro Heq.           (* assume A = B … *)
+        intro Heq. (* Assume A = B and derive a contradiction. *)
         subst B.
         inversion Hnodup as [| ? k Hnotin _].
         contradiction Hnotin. simpl. left. reflexivity.
@@ -704,8 +694,8 @@ Proof.
     assert (Hproper : nonempty_proper_subset A).
     { 
       split.
-      + exists a; exact Ha.                    (* non-empty *)
-      + exists b. exact Hnb.                              (* not whole S *)
+      + exists a; exact Ha.  (* non-empty *)
+      + exists b. exact Hnb. (* not whole S *)
     }
 
     (* Apply the “two ε-close points” axiom to that proper subset A *)
@@ -732,7 +722,7 @@ Proof.
         (apply HA0_ball; unfold e_ball;
          rewrite distance_function_refl; apply le_0_n).
     assert (HxA0  : A0 x') by (apply HA0_ball; exact Hball).
-    (* turn HA0_in into a fact about (parts p) -------------------------- *)
+    (* Reinterpret HA0_in as an In-fact about (parts p). *)
     assert (HA0_parts : In A0 (parts p))
       by (rewrite Hparts; exact HA0_in).
 
@@ -744,7 +734,7 @@ Proof.
       split; [ exact HyA0 | exact Hy_in ]. }
 
     contradict Hx_out.
-    subst A0.                 (* replaces every A0 by A everywhere     *)
+    subst A0. (* replaces every A0 by A everywhere *)
     exact HxA0.
 
   * 
@@ -759,7 +749,7 @@ Proof.
          rewrite distance_function_refl; apply le_0_n).
     
     assert (HyA0  : A0 y) by (apply HA0_ball; exact Hball).
-    (* turn HA0_in into a fact about (parts p) -------------------------- *)
+    (* turn HA0_in into a fact about (parts p) *)
     assert (HA0_parts : In A0 (parts p))
       by (rewrite Hparts; exact HA0_in).
 
@@ -771,18 +761,13 @@ Proof.
       split; [ exact HyA0 | exact Hy_in ]. }
 
     contradict Hx_out.
-    subst A0.                 (* replaces every A0 by A everywhere     *)
+    subst A0. (* replaces every A0 by A everywhere *)
     exact HxA0.
-    
-    
-    
-    
 Qed.
 
 
-
 (*==============================================================*)
-(**            Theorem 5  (Distances Limit Global Robustness)   *)
+(** Theorem 5  (Distances Limit Global Robustness)              *)
 (*==============================================================*)
 Theorem distances_limit_global_robustness (d : distance_function):
   (inhabited S) ->
@@ -801,19 +786,20 @@ Qed.
 
 
 
-
-
-
-
-
-
+(*==============================================================*)
 (*==============================================================*)
 (** Section 4.3: Global Robustness in Computer Arithmetic       *)
 (*==============================================================*)
+(*==============================================================*)
 
+ (** A strict total order: irreflexive, transitive, and total. *)
   (** We work with a strict order [lt]. *)
   Variable lt : S -> S -> Prop.
-  Variable d : distance_function.
+  Hypothesis lt_irrefl  : forall x : S, ~ lt x x.
+  Hypothesis lt_trans   : forall x y z : S, lt x y -> lt y z -> lt x z.
+  Hypothesis lt_total   : forall x y : S, x = y \/ lt x y \/ lt y x.
+  Hypothesis lt_dec : forall x y, {lt x y} + {~ lt x y}.
+
 
   Definition ge (x y : S) : Prop := lt y x \/ x = y.
   Definition le (x y : S) : Prop := lt x y \/ x = y.
@@ -830,15 +816,10 @@ Qed.
   Definition is_minimum_in (x : S) (A : S -> Prop) : Prop :=
     A x /\ (forall y : S, A y -> le x y).
 
-
-
- (** A strict total order: irreflexive, transitive, and total. *)
-  Hypothesis lt_irrefl  : forall x : S, ~ lt x x.
-  Hypothesis lt_trans   : forall x y z : S, lt x y -> lt y z -> lt x z.
-  Hypothesis lt_total   : forall x y : S, x = y \/ lt x y \/ lt y x.
   
+  Variable d : distance_function.
 
-  (** * Finiteness of S by an explicit list *)
+  (** Explicit finite enumeration of S. *)
   Variable elems : list S.
   (** every element of S appears in [elems] *)
   Hypothesis elems_complete : forall x : S, In x elems.
@@ -846,10 +827,19 @@ Qed.
   Hypothesis elems_nodup    : NoDup elems.
 
 
+(** A propper subset of elems. *)
+Variable S' : list S.
+Hypothesis S'_nonempty : exists x, In x S'.
+Hypothesis S'_proper   : exists y, In y elems /\ ~ In y S'.
+Hypothesis S'_subset   : forall x, In x S' -> In x elems.
+Hypothesis S'_decidable: forall x y, In x S' /\ In y S' -> {x = y} + {x <> y}.
+Hypothesis S'_nodup    : NoDup S'.
+
+
+
   Definition is_successor (x y : S) : Prop := lt x y /\ (forall z : S, ~ (lt x z /\ lt z y)).
 
-  Hypothesis lt_dec : forall x y, {lt x y} + {~ lt x y}.
-
+  
    Definition succb (x y : S) : bool :=
     match lt_dec x y with
     | left Hlt =>
@@ -894,7 +884,6 @@ Proof.
           right; assumption.
 Qed.
 
-
 Lemma if_false_else_true_true (b : bool) :
   (if b then false else true) = true <-> b = false.
 Proof. destruct b; simpl; split; congruence. Qed.
@@ -911,19 +900,19 @@ Proof.
   rewrite existsb_forall.
   split; intros H z Hz; specialize (H z Hz).
   destruct (lt_dec x z) as [Hxz|Hnx]; destruct (lt_dec z y) as [Hzy|Hnzy]; simpl in H.
-  - (* x<z, z<y *) discriminate H.
-  - (* x<z, ¬z<y *) intros [ _ Hzy ]. now apply Hnzy.
-  - (* ¬x<z, z<y *) intros [ Hxz _ ]. now apply Hnx.
-  - (* ¬x<z, ¬z<y *) intros [Hxz' _]. now apply Hnzy.
+  - (* x < z ∧ z < y. *) discriminate H.
+  - (* x < z ∧ ¬ z < y. *) intros [ _ Hzy ]. now apply Hnzy.
+  - (* ¬ x < z ∧ z < y. *) intros [ Hxz _ ]. now apply Hnx.
+  - (* ¬ x < z ∧ ¬ z < y. *) intros [Hxz' _]. now apply Hnzy.
   - destruct (lt_dec x z) as [Hxz|Hnxz].
-    + (* case x<z *)
-  destruct (lt_dec z y) as [Hzy|Hnzy].
-  * (* case z<y too ⇒ bool = true, but H forbids it *)
-    exfalso; apply H; split; assumption.
-  * (* case ¬ z<y ⇒ bool = false *)
-    simpl; reflexivity.
-+ (* case ¬ x<z ⇒ bool = false *)
-  simpl; reflexivity.
+    + (* Case x < z. *)
+      destruct (lt_dec z y) as [Hzy|Hnzy].
+      * (* Sub-case z < y: boolean would be true, contradicting H. *)
+        exfalso; apply H; split; assumption.
+      * (* Sub-case ¬ z < y: test yields false. *)
+        simpl; reflexivity.
+    + (* Case ¬ x < z: test yields false. *)
+      simpl; reflexivity.
 Qed.
 
 Lemma succb_correct x y :
@@ -942,46 +931,37 @@ Proof.
     + intros [Hxy' Hno].
       intros z Hin.
       apply Hno.
-  - (* ¬ x<y: succb = false, is_successor x y = False *)
+  - (* ¬ x<y: succb = false and is_successor x y is impossible. *)
     simpl; split.
     + discriminate.
     + intros []. auto.
 Qed.
 
- (** 4) list all pairs *)
-  Definition all_pairs : list (S * S) :=
-    flat_map (fun x => map (fun y => (x,y)) elems) elems.
+(* Step 4 – enumerate all ordered pairs (x,y) from elems. *)
+Definition all_pairs : list (S * S) :=
+  flat_map (fun x => map (fun y => (x,y)) elems) elems.
 
-  (** 5) filter to just the successor-adjacent ones *)
+(* Step 5 – keep only pairs that form a successor relation. *)
 Definition succ_pairs : list (S * S) :=
-  filter (fun p : S * S =>
-            let (x,y) := p in
-            succb x y || succb y x)
-         all_pairs.
+filter (fun p : S * S =>
+          let (x,y) := p in
+          succb x y || succb y x)
+        all_pairs.
 
 
-  (** 6) pull out their distances *)
-  Definition gaps : list nat :=
-    map (fun p => d (fst p) (snd p)) succ_pairs.
+(* Step 6 – map each successor pair to its distance. *)
+Definition gaps : list nat :=
+  map (fun p => d (fst p) (snd p)) succ_pairs.
 
-  (** 7) a little utility to take the maximum of a non-empty list of reals *)
-  Fixpoint max_list (l : list nat) : nat :=
-    match l with
-    | []    => 0     (* we’ll later show [gaps] is never empty, so this case won’t matter *)
-    | r::rs => max r (max_list rs)
-    end.
+(** Utility 7 – maximum of a non-empty list of naturals *)
+Fixpoint max_list (l : list nat) : nat :=
+  match l with
+  | []    => 0 (* This branch is unreachable because we prove later that [gaps] is non-empty. *)
+  | r::rs => max r (max_list rs)
+  end.
 
-  (** 8) finally, the precision gap Δ *)
-  Definition precision_gap : nat := max_list gaps.
-
-Variable S' : list S.
-Hypothesis S'_nonempty : exists x, In x S'.
-Hypothesis S'_proper   : exists y, In y elems /\ ~ In y S'.
-Hypothesis S'_subset   : forall x, In x S' -> In x elems.
-Hypothesis S'_decidable: forall x y, In x S' /\ In y S' -> {x = y} + {x <> y}.
-Hypothesis S'_nodup    : NoDup S'.
-
-
+(** Step 8 – define the precision gap Δ as the maximum of gaps. *)
+Definition precision_gap : nat := max_list gaps.
 
 (** all elements strictly between [x] and [y] *)
 Definition betw (x y : S) : list S :=
@@ -991,32 +971,31 @@ Definition betw (x y : S) : list S :=
             else false)
          elems.
 
-
 Lemma list_has_unique_max
       (l : list S) (Hne : l <> []) :
   exists! m, In m l /\ (forall y, In y l -> ge m y).
 Proof.
-  (* classical choice will come in handy when we compare two candidates *)
+  (* Store lt_total in Hcmp for later comparisons. *)
   assert (Hcmp := lt_total).
 
-  (* we do induction from the right with the *standard* rev_ind *)
+  (* Use rev_ind for right-to-left induction. *)
   induction l using rev_ind.
-  - contradiction.                       (* base [] impossible (Hne) *)
+  - contradiction. (* Base case [] cannot occur because l is non-empty (hypothesis Hne). *)
   - destruct l as [| h t].
-    + (* singleton list [x] *)
+    + (* Base case: the list is [x]. *)
       exists x; split.
       * split; [now left | intros y [<-|[]]; right; reflexivity].
       * intros m'.
         intros [Hin _].
         inversion Hin; subst; [auto | tauto].
-    + (* proper snoc t ++ [x]; IH gives a unique max m for t --------- *)
+    + (* Inductive step: list = t ++ [x]; IH supplies the unique maximum m of t. *)
       destruct IHl as [m [[Hm_in Hm_ge] Hm_unique]].
       { intro Ht_nil. apply Hne. now rewrite Ht_nil. }
 
       (* compare the old maximum [m] with the new element [x] *)
       destruct (Hcmp m x) as [Heq | [Hlt_mx | Hlt_xm]].
 
-      * (* m = x : keep m (== x) as unique max ----------------------- *)
+      * (* Subcase m = x: keep m (= x) as the unique maximum. *)
         subst. exists x; split.
         -- split; [now apply in_or_app; right; left| ].
            intros y Hy. apply Hm_ge.
@@ -1034,26 +1013,26 @@ Proof.
             ** intros y Hy. apply Hge. apply in_or_app. now left.
           ++ (* Case: m' = x *)
             destruct Hin_x as [Heq | Hin_nil]. (* In [x] is just m' = x or impossible *)
-            ** exact Heq.                      (* m' = x ⟹ done *)
-            ** contradiction.                  (* [] ⟹ impossible *)
+            ** exact Heq.     (* m' = x ⟹ done *)
+            ** contradiction. (* [] ⟹ impossible *)
 
 
 
 
-      * (* m < x : x becomes the new maximum ------------------------ *)
+      * (* Sub-case m < x: retain m as the unique maximum. *)
         exists x; split.
         -- split.
            ++ apply in_or_app. right. simpl. left. auto. 
            ++ intros y Hy.
               destruct (in_app_or _ _ _ Hy) as [Hy_in_t | [Hy_eq | []] ].
-              ** (* y in t : compare via m ≤ y ≤ x -------------------- *)
+              ** (* y in t : compare via m ≤ y ≤ x *)
                  specialize (Hm_ge y Hy_in_t).
                 unfold ge in Hm_ge.
                 destruct Hm_ge as [Hlym | Heqm].
                  left. apply lt_trans with (y:=m); assumption.
                  subst y.
                 unfold ge. left. exact Hlt_mx.
-              ** (* y = x -------------------------------------------- *)
+              ** (* y = x *)
                  right; subst; reflexivity.
         -- intros m' [Hin Hge].
             rewrite in_app_iff in Hin; simpl in Hin.
@@ -1072,7 +1051,7 @@ Proof.
             ** symmetry. exact H.
           ++ auto.
           ++ exfalso. exact H.
-      * (* x < m : keep old maximum m ------------------------------- *)
+      * (* Sub-case x < m: retain m as the maximum. *)
         exists m; split.
         -- split; [apply in_or_app; left; assumption| ].
            intros y Hy. destruct (in_app_or _ _ _ Hy) as [Hy_in_t | [Hy_eq|[]] ].
@@ -1108,23 +1087,23 @@ Proof.
   (* totality of < lets us compare two candidates *)
   assert (Hcmp := lt_total).
 
-  (* right-to-left induction with the standard rev_ind *)
+  (* Use rev_ind for right-to-left induction. *)
   induction l using rev_ind.
-  - contradiction.                                   (* base [] impossible (Hne) *)
+  - contradiction. (* base [] impossible (Hne) *)
   - destruct l as [| h t].
-    + (* singleton list [x] ----------------------------------------------------- *)
+    + (* Base case: the list is [x]. *)
       exists x; split.
       * split; [now left | intros y [<-|[]]; right; reflexivity].
       * intros m' [Hin _]. inversion Hin; subst; [auto | tauto].
 
-    + (* proper snoc t ++ [x] ; IH gives a unique min m for t ------------------ *)
+    + (* Inductive step: list = t ++ [x]; IH supplies the unique minimum m of t. *)
       destruct IHl as [m [[Hm_in Hm_le] Hm_unique]].
       { intro Ht_nil. apply Hne. now rewrite Ht_nil. }
 
       (* compare the old minimum [m] with the new element [x] *)
       destruct (Hcmp m x) as [Heq | [Hlt_mx | Hlt_xm]].
 
-      * (* m = x : keep x (== m) as unique min --------------------------------- *)
+      * (* Sub-case m = x: keep x (= m) as the unique minimum. *)
         subst. exists x; split.
         -- split; [now apply in_or_app; right; left| ].
            intros y Hy. apply in_app_iff in Hy as [Hy_t | Hy_x].
@@ -1139,7 +1118,7 @@ Proof.
            ++ (* m' = x *)
               destruct Hin_x as [->|[]]; reflexivity.
 
-      * (* m < x : keep m as unique min --------------------------------------- *)
+      * (* Sub-case m < x: retain m as the unique minimum. *)
         exists m; split.
         -- split; [apply in_or_app; left; exact Hm_in| ].
            intros y Hy.
@@ -1158,7 +1137,7 @@ Proof.
                  apply lt_trans with x; assumption.
            ++ intros y Hy. apply Hle. apply in_or_app; left; exact Hy.
 
-      * (* x < m : x becomes the new minimum ---------------------------------- *)
+      * (* Sub-case x < m: x becomes the new minimum. *)
         exists x; split.
         -- split.
            ++ apply in_or_app; right; simpl; left; auto.
@@ -1198,7 +1177,7 @@ Proof.
           filter (fun x => if excluded_middle_informative (A x) then true else false)
                  elems).
 
-  (* [sub] really enumerates exactly the elements of [A] ---------------------*)
+  (* The list sub enumerates precisely the elements of A. *)
   assert (Hsub_spec : forall x, In x sub <-> A x).
   { intro x. unfold sub.
     rewrite filter_In.
@@ -1209,7 +1188,7 @@ Proof.
       + destruct (excluded_middle_informative (A x)); [reflexivity|contradiction].
   }
 
-  (* [sub] is non-empty because [A] is --------------------------------------*)
+  (* sub is non-empty because A is non-empty. *)
   assert (Hsub_nonempty : sub <> []).
   { 
     intro Hnil. rewrite Hnil in *.
@@ -1219,18 +1198,18 @@ Proof.
     rewrite Hnil in Ha0.
     contradiction.
   }
-  (* apply the list lemma --------------------------------------------------- *)
+  (* Apply list_has_unique_max/min to sub. *)
   destruct (list_has_unique_max sub Hsub_nonempty)
            as [m [[Hm_in Hm_ge] Hm_unique]].
 
   exists m; split.
-  - (* existence ----------------------------------------------------------- *)
+  - (* Existence part. *)
     unfold is_maximum_in.
     split.
     + apply (proj1 (Hsub_spec m)); assumption.
     + intros y HyA. apply Hm_ge, (proj2 (Hsub_spec y)); assumption.
 
-  - (* uniqueness ----------------------------------------------------------- *)
+  - (* Uniqueness part. *)
     intros m' [Hm'A Hm'_ge].
     apply Hm_unique. split.
     + apply (proj2 (Hsub_spec m')); assumption.
@@ -1251,7 +1230,7 @@ Proof.
           filter (fun x => if excluded_middle_informative (A x) then true else false)
                  elems).
 
-  (* [sub] really enumerates exactly the elements of [A] ---------------------*)
+  (* [sub] really enumerates exactly the elements of [A] *)
   assert (Hsub_spec : forall x, In x sub <-> A x).
   { intro x. unfold sub.
     rewrite filter_In.
@@ -1262,7 +1241,7 @@ Proof.
       + destruct (excluded_middle_informative (A x)); [reflexivity|contradiction].
   }
 
-  (* [sub] is non-empty because [A] is --------------------------------------*)
+  (* [sub] is non-empty because [A] is *)
   assert (Hsub_nonempty : sub <> []).
   { 
     intro Hnil. rewrite Hnil in *.
@@ -1272,18 +1251,18 @@ Proof.
     rewrite Hnil in Ha0.
     contradiction.
   }
-  (* apply the list lemma --------------------------------------------------- *)
+  (* apply the list lemma *)
   destruct (list_has_unique_min sub Hsub_nonempty)
            as [m [[Hm_in Hm_le] Hm_unique]].
 
   exists m; split.
-  - (* existence ----------------------------------------------------------- *)
+  - (* existence *)
     unfold is_maximum_in.
     split.
     + apply (proj1 (Hsub_spec m)); assumption.
     + intros y HyA. apply Hm_le, (proj2 (Hsub_spec y)); assumption.
 
-  - (* uniqueness ----------------------------------------------------------- *)
+  - (* uniqueness *)
     intros m' [Hm'A Hm'_le].
     apply Hm_unique. split.
     + apply (proj2 (Hsub_spec m')); assumption.
@@ -1295,19 +1274,19 @@ Qed.
     has an immediate predecessor in [S]. *)
 Lemma non_global_minimum_has_predecessor
       (A : S -> Prop) (x : S) :
-  is_minimum_in x A      (* x is the minimum of the subset A *)
-  -> ~ is_minimum x      (* …but x is NOT the minimum of the whole set *)
+  is_minimum_in x A (* x is the minimum of the subset A *)
+  -> ~ is_minimum x (* but x is not the global minimum of S. *)
   -> exists y, is_successor y x.
 Proof.
   intros HminA Hnot_min.
 
-  (* --- 1.  There exists some y with [lt y x] ------------------------------- *)
+  (* Step 1 – obtain a witness y such that lt y x. *)
   assert (Hex_lt : exists y, lt y x).
   { (* from  ¬(∀y, ge y x)  we get a witness [y0] with ¬ge y0 x            *)
     apply not_all_ex_not in Hnot_min as [y0 Hny].
     (* Use totality to decide the relation between y0 and x *)
     destruct (lt_total y0 x) as [Heq | [Hlt_y0x | Hlt_xy0]].
-    - (* case y0 = x  contradicts  ¬ge y0 x                                *)
+    - (* case y0 = x  contradicts  ¬ge y0 x *)
       unfold ge in Hny.
       assert (False) as Hf.
       {
@@ -1316,9 +1295,9 @@ Proof.
         right. reflexivity. (* y0 = x *)
       }
       contradiction.
-    - (* case y0 < x : that is what we need                                *)
+    - (* case y0 < x : that is what we need  *)
       now exists y0.
-    - (* case x < y0 ⇒ ge y0 x holds via left disjunct, contradiction      *)
+    - (* case x < y0 ⇒ ge y0 x holds via left disjunct, contradiction *)
       unfold ge in Hny.
       exfalso.
       contradict Hny.
@@ -1326,20 +1305,20 @@ Proof.
       apply Hlt_xy0.
   }
 
-  (* --- 2.  Consider the set [B] of elements *below* [x] ------------------- *)
+  (* Step 2 – define B as all elements strictly smaller than x. *)
   set (B := fun y : S => lt y x).
 
   (* [B] is non-empty *)
   destruct Hex_lt as [y0 Hy0].
   assert (HBne : exists y, B y) by (exists y0; exact Hy0).
 
-  (* --- 3.  Finite-set lemma ⇒ [p] is the unique maximum of [B] ----------- *)
+  (* Step 3 – apply the finite-set lemma to get the unique maximum p of B. *)
   destruct (subset_has_unique_maximum B HBne)
            as [p [[Hpltx Hmax] _]].
   (*   Hpltx : lt p x
        Hmax  : forall z, B z -> ge p z  (i.e. p ≥ every z < x) *)
 
-  (* --- 4.  Show that [p] is an immediate predecessor of [x] -------------- *)
+  (* Step 4 – prove that p is an immediate predecessor of x. *)
   exists p. unfold is_successor. split.
   - exact Hpltx.
   - intros z [Hpz Hzx].                 (* lt p z ∧ lt z x *)
@@ -1362,23 +1341,23 @@ Lemma boundary_pair_exists :
     ((In x' S' /\ ~ In x S') \/ (In x S' /\ ~ In x' S')) /\
     (is_successor x x' \/ is_successor x' x).
 Proof.
-  (* -------- 1.  the unique minimum m of S' ------------------------------ *)
+  (* Step 1 – choose the unique minimum m of S'. *)
   set (A := fun z : S => In z S').
   destruct S'_nonempty as [s0 Hs0].
   destruct (subset_has_unique_minimum A (ex_intro _ s0 Hs0))
     as [m [[Hm_inS Hm_min] _]].
 
-  (* -------- 2.  Case analysis on m being a global minimum --------------- *)
+  (* Step 2 – analyse whether m is a global minimum. *)
   destruct (classic (is_minimum m)) as [Hglob_min | Hnot_min_m].
 
-  (* ===== CASE 1 :  m IS the global minimum ============================== *)
-  - (* Work with the complement C := S \ S' ----------------------------- *)
+  (* Case 1: m is the global minimum of S. *)
+  - (* Work with the complement C := S \ S' *)
     set (C := fun z : S => ~ In z S').
     destruct S'_proper as [c0 [_ Hc0_notS]].
     destruct (subset_has_unique_minimum C (ex_intro _ c0 Hc0_notS))
       as [mc [[Hmc_notS Hmc_min] _]].
 
-    (* m < mc :   mc is strictly above the global minimum m ------------- *)
+    (* Observe that m < mc, so mc lies strictly above the global minimum m. *)
     assert (Hlt_m_mc : lt m mc).
     { destruct (lt_total m mc) as [Heq | [Hlt | Hgt]].
       - subst; contradiction.
@@ -1392,7 +1371,7 @@ Proof.
         assert (lt mc mc) by (eapply lt_trans; [exact Hgt|exact Hlt']).
         now apply (lt_irrefl mc) in H. }
 
-    (* mc is *not* a global minimum ------------------------------------- *)
+    (* mc is *not* a global minimum *)
     assert (Hnot_min_mc : ~ is_minimum mc).
     { intro Hmin_mc.
       unfold is_minimum in Hmin_mc.
@@ -1403,7 +1382,7 @@ Proof.
       assert (lt mc mc) by (eapply lt_trans; [exact Hlt|exact Hlt_m_mc]).
       now apply (lt_irrefl mc) in H. }
 
-    (* mc’s predecessor p lies in S' ------------------------------------ *)
+    (* The predecessor p of mc must belong to S'. *)
     assert (HminC : is_minimum_in mc C) by (split; assumption).
     destruct (non_global_minimum_has_predecessor C mc HminC Hnot_min_mc)
       as [p Hp_succ].                              (* is_successor p mc *)
@@ -1422,7 +1401,7 @@ Proof.
         apply lt_irrefl.
     }
 
-    (* Produce the boundary pair (p, mc) -------------------------------- *)
+    (* Produce the boundary pair (p, mc) *)
     exists p, mc.
     repeat split.
     + apply elems_complete.
@@ -1430,8 +1409,8 @@ Proof.
     + right; split; assumption.            (* p ∈ S',  mc ∉ S' *)
     + left; exact Hp_succ.                 (* is_successor p mc *)
 
-  (* ===== CASE 2 :  m is NOT the global minimum ========================= *)
-  - (* m has a predecessor p lying outside S' --------------------------- *)
+  (* Case 2 – m is not the global minimum of S. *)
+  - (* m admits a predecessor p that is not in S'. *)
     assert (HminA : is_minimum_in m A) by (split; assumption).
     destruct (non_global_minimum_has_predecessor A m HminA Hnot_min_m)
       as [p Hp_succ].                              (* is_successor p m *)
@@ -1446,7 +1425,7 @@ Proof.
         now apply (lt_irrefl p) in H.
       - subst; now apply (lt_irrefl p) in Hlt_p_m. }
 
-    (* Produce the boundary pair (p, m) --------------------------------- *)
+    (* Build the boundary pair (p, m). *)
     exists p, m.
     repeat split.
     + apply elems_complete.
@@ -1485,7 +1464,7 @@ Proof.
   unfold precision_gap.
   apply max_list_ge.
   unfold gaps.
-  (* explicitly tell it which f and which x you mean *)
+  (* Provide the concrete function and pair required by in_map_fst. *)
   apply in_map_fst
     with (f := fun p => d (fst p) (snd p))
          (x := (x, x')).
@@ -1494,7 +1473,7 @@ Qed.
 
 
 (*==============================================================*)
-(**            Theorem 6  (Precision Gap Constraint)            *)
+(** Theorem 6  (Precision Gap Constraint)                       *)
 (*==============================================================*)
 Theorem precision_gap_constraint :
   exists x x',
@@ -1502,13 +1481,14 @@ Theorem precision_gap_constraint :
     ((In x' S' /\ ~ In x S') \/ (In x S' /\ ~ In x' S')) /\
     d x x' <= precision_gap.
 Proof.
-  (* 1. There is a boundary pair *)
+  (* Step 1 – obtain a boundary pair. *)
   edestruct boundary_pair_exists as (x & x' & Hx & Hx' & Hbd & Hsucc).
 
-  (* 2. This pair is in succ_pairs by definition *)
+  (* Step 2 – show the pair lies in succ_pairs. *)
   assert (Hin : In (x, x') succ_pairs).
   {
     unfold succ_pairs, all_pairs.
+
     apply filter_In.
     split.
     - apply in_flat_map. exists x. split; [exact Hx|].
@@ -1524,15 +1504,18 @@ Proof.
         exact Hs.
   }
 
-  (* 3. So its distance is in gaps, hence ≤ precision_gap *)
+  (* Step 3 – deduce d x x' ≤ precision_gap because the pair is in gaps. *)
   assert (Hgap : d x x' <= precision_gap).
   { apply gap_leq_precision_gap; exact Hin. }
 
   exists x, x'. repeat (split; try assumption).
 Qed.
 
-Arguments global_robustness_implies_distances.
+Arguments classifier_induces_partition c: assert.
+Arguments equivalence_of_definitions_classifier_partition c {d}.
+Arguments global_robustness_is_separability c {d}.
+Arguments robustness_of_all_subpartitions p {d}.
+Arguments distances_limit_global_robustness d _: assert.
 Arguments precision_gap_constraint : assert.
 
 End Paper.
-
