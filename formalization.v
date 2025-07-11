@@ -387,15 +387,15 @@ Definition restrict_subset (A : subset) (S0 : subset) : subset :=
 
 (* Keep every intersection with S₀ (even empty ones); the robustness property only concerns points actually in S₀, so empty blocks are harmless. *)
 Definition subpartition (p : partition) (S0 : subset) : list subset :=
-  map (fun A => restrict_subset A S0) (parts p).
+  map (fun S' => restrict_subset S' S0) (parts p).
 
 
 Definition globally_robust_subpartition 
 (p : partition) (d : distance_function) (S0 : subset) : Prop :=
   forall x, S0 x ->
-    exists A,
-      In A (subpartition p S0) /\
-      (forall y, S0 y -> e_ball d x y -> A y).
+    exists S',
+      In S' (subpartition p S0) /\
+      (forall y, S0 y -> e_ball d x y -> S' y).
 
 (*==============================================================*)
 (** Theorem 4  (Robustness of All Subpartitions)                *)
@@ -460,9 +460,9 @@ Definition nonempty_proper_subset (S' : subset) : Prop :=
   (exists x, S' x) /\ (exists x, ~ S' x).
 
 Definition trivial_partition (p : partition) : Prop :=
-  exists A, parts p = [A].
+  exists S', parts p = [S'].
 
-Definition compl (A : subset) : subset := fun x => ~ A x.
+Definition compl (S' : subset) : subset := fun x => ~ S' x.
 
 
 
@@ -827,19 +827,18 @@ Qed.
   Hypothesis elems_nodup    : NoDup elems.
 
 
-(** A propper subset of elems. *)
-Variable S' : list S.
-Hypothesis S'_nonempty : exists x, In x S'.
-Hypothesis S'_proper   : exists y, In y elems /\ ~ In y S'.
-Hypothesis S'_subset   : forall x, In x S' -> In x elems.
-Hypothesis S'_decidable: forall x y, In x S' /\ In y S' -> {x = y} + {x <> y}.
-Hypothesis S'_nodup    : NoDup S'.
-
+  (** A propper subset of elems. *)
+  Variable S' : list S.
+  Hypothesis S'_nonempty : exists x, In x S'.
+  Hypothesis S'_proper   : exists y, In y elems /\ ~ In y S'.
+  Hypothesis S'_subset   : forall x, In x S' -> In x elems.
+  Hypothesis S'_decidable: forall x y, In x S' /\ In y S' -> {x = y} + {x <> y}.
+  Hypothesis S'_nodup    : NoDup S'.
 
 
   Definition is_successor (x y : S) : Prop := lt x y /\ (forall z : S, ~ (lt x z /\ lt z y)).
 
-  
+
    Definition succb (x y : S) : bool :=
     match lt_dec x y with
     | left Hlt =>
@@ -854,6 +853,39 @@ Hypothesis S'_nodup    : NoDup S'.
     | right _ => false
     end.
 
+(* Step 4 – enumerate all ordered pairs (x,y) from elems. *)
+Definition all_pairs : list (S * S) :=
+  flat_map (fun x => map (fun y => (x,y)) elems) elems.
+
+(* Step 5 – keep only pairs that form a successor relation. *)
+Definition succ_pairs : list (S * S) :=
+filter (fun p : S * S =>
+          let (x,y) := p in
+          succb x y || succb y x)
+        all_pairs.
+
+
+(* Step 6 – map each successor pair to its distance. *)
+Definition gaps : list nat :=
+  map (fun p => d (fst p) (snd p)) succ_pairs.
+
+(** Utility 7 – maximum of a non-empty list of naturals *)
+Fixpoint max_list (l : list nat) : nat :=
+  match l with
+  | []    => 0 (* This branch is unreachable because we prove later that [gaps] is non-empty. *)
+  | r::rs => max r (max_list rs)
+  end.
+
+(** Step 8 – define the precision gap Δ as the maximum of gaps. *)
+Definition precision_gap : nat := max_list gaps.
+
+(** all elements that are strictly between [x] and [y] *)
+Definition betw (x y : S) : list S :=
+  filter (fun z =>
+            if lt_dec x z
+            then if lt_dec z y then true else false
+            else false)
+         elems.
 
 
 Lemma existsb_forall {A} (p : A -> bool) (l : list A) :
@@ -936,40 +968,6 @@ Proof.
     + discriminate.
     + intros []. auto.
 Qed.
-
-(* Step 4 – enumerate all ordered pairs (x,y) from elems. *)
-Definition all_pairs : list (S * S) :=
-  flat_map (fun x => map (fun y => (x,y)) elems) elems.
-
-(* Step 5 – keep only pairs that form a successor relation. *)
-Definition succ_pairs : list (S * S) :=
-filter (fun p : S * S =>
-          let (x,y) := p in
-          succb x y || succb y x)
-        all_pairs.
-
-
-(* Step 6 – map each successor pair to its distance. *)
-Definition gaps : list nat :=
-  map (fun p => d (fst p) (snd p)) succ_pairs.
-
-(** Utility 7 – maximum of a non-empty list of naturals *)
-Fixpoint max_list (l : list nat) : nat :=
-  match l with
-  | []    => 0 (* This branch is unreachable because we prove later that [gaps] is non-empty. *)
-  | r::rs => max r (max_list rs)
-  end.
-
-(** Step 8 – define the precision gap Δ as the maximum of gaps. *)
-Definition precision_gap : nat := max_list gaps.
-
-(** all elements strictly between [x] and [y] *)
-Definition betw (x y : S) : list S :=
-  filter (fun z =>
-            if lt_dec x z
-            then if lt_dec z y then true else false
-            else false)
-         elems.
 
 Lemma list_has_unique_max
       (l : list S) (Hne : l <> []) :
