@@ -1,3 +1,6 @@
+(*=================================================================================*)
+(** The following theory has been synthesized with human guidance by using ChatGPT *)
+(*=================================================================================*)
 From Coq Require Import Classical List Arith Lia. 
 Require Import Coq.Lists.List.
 Import ListNotations. 
