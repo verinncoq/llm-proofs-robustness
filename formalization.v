@@ -1,29 +1,21 @@
-From Coq Require Import Classical List Arith Lia Sorting. 
+From Coq Require Import Classical List Arith Lia. 
 Require Import Coq.Lists.List.
 Import ListNotations. 
 Require Import Classical_Prop.
-Require Import Coq.Classes.RelationClasses.
-From Coq Require Import Reals.
-Require Import ClassicalDescription.
-Require Import Coq.Init.Wf.
-Require Import Coq.Structures.OrderedType.
-Require Import Coq.Program.Tactics.
-Require Import Coq.Program.Wf.
-From Coq.Wellfounded Require Import Wellfounded.
+Require Import Coq.Logic.ClassicalDescription.
 Require Import Coq.Bool.Bool.
-Require Import Coq.Lists.List Coq.Init.Peano.
-Require Import Coq.Program.Tactics.
 Require Import Coq.Logic.Classical_Prop.
-From Coq.Logic Require Import ChoiceFacts.
-From Coq.Logic Require Import Epsilon.
-Require Import ClassicalEpsilon.
 Require Import Coq.Arith.PeanoNat.
-Require Import Coq.Init.Wf.  (* for well_founded_induction *)
-Require Import Coq.Arith.Wf_nat.  (* for lt_wf *)
 
 Section Paper.
 
+(*======================================================================*)
+(** Section 3: Preliminaries                                            *)
+(*======================================================================*)
+
+
 Context {S : Type}.
+Variable S_eq_dec : forall (x y : S), { x = y } + { x <> y }.
 Variable n : nat. (** Comment - Anzahl der Klassen *)
 Variable e : nat. (** Comment - epsilon *)
 
@@ -92,7 +84,6 @@ Qed.
 Record distance_function : Type := {
   distance_function_fun   :> S -> S -> nat;
   distance_function_refl : forall x : S, distance_function_fun x x = 0;
-  distance_function_nonneg : forall x y, 0 >= distance_function_fun x y;
 }.
 
 (** Definition 3: Local Robustness *)
@@ -103,13 +94,10 @@ Definition locally_robust_classifier(x : S) (c : classifier) (d : distance_funct
 Definition globally_robust_classifier(c : classifier) (d : distance_function) : Prop :=
   forall x : S, locally_robust_classifier x c d.
 
-(** Definition 5: Partition
-Record partition (P : list subset) : Prop := {
-  partition_nonempty : forall A, In A P -> exists x, A x;
-  partition_cover    : forall x, exists A, In A P /\ A x;
-  partition_disjoint : forall A B, In A P -> In B P -> A <> B -> forall x, ~(A x /\ B x)
-}. *)
 
+(*======================================================================*)
+(** Section 4.1: Global Robustness on Classifier Induced Partitions.    *)
+(*======================================================================*)
 
 (** Definition 5: Partition *)
 Record partition : Type := {
@@ -203,8 +191,10 @@ Proof.
 Defined.
 
 
-(** Theorem 1: A classifier induces a partition *)
-Lemma classifier_induces_partition (c : classifier) : partition.
+(*==============================================================*)
+(**            Theorem 1  (A classifier induces a partitions)   *)
+(*==============================================================*)
+Theorem classifier_induces_partition (c : classifier) : partition.
 Proof.
   exact (induced_partition c).
 Qed.
@@ -304,7 +294,10 @@ Qed.
 
 
 (** Theorem 2: Equivalence of Definitions - Induced Partition is Globally Robust IFF Classifier Is Globally Robust *)
-Lemma induced_partition_glob_rob_iff_classifier_glob_rob :
+(*==============================================================*)
+(**            Theorem 2  (Equivalence of Definitions)          *)
+(*==============================================================*)
+Theorem equivalence_of_definitions_classifier_partition :
   forall (c : classifier) (d : distance_function),
     globally_robust_classifier c d <-> globally_robust_partition (induced_partition c) d.
 Proof.
@@ -321,8 +314,10 @@ Definition robust_partition
     A <> B ->
     forall a b, A a -> B b -> e < d a b.
 
-
-Lemma global_robustness_iff_separability :
+(*==============================================================*)
+(**            Theorem 3  (Global Robustness is Separability)   *)
+(*==============================================================*)
+Theorem global_robustness_is_separability :
   forall (c : classifier) (d : distance_function),
     globally_robust_classifier c d  <->
     robust_partition (induced_partition c) d.
@@ -392,22 +387,6 @@ Definition restrict_subset (A : subset) (S0 : subset) : subset :=
 Definition subpartition (p : partition) (S0 : subset) : list subset :=
   map (fun A => restrict_subset A S0) (parts p).
 
-Lemma in_subpartition :
-  forall (p : partition) (S0 : subset) (A : subset),
-    In A (parts p) ->
-    In (restrict_subset A S0) (subpartition p S0).
-Proof.
-  intros p S0 A Hin.
-  unfold subpartition.
-  (* tell Coq exactly which f we are talking about *)
-  apply (in_map (fun A0 => restrict_subset A0 S0)).
-  exact Hin.
-Qed.
-
-
-(*--------------------------------------------------------------*)
-(**  Robustness of a sub-partition on a chosen subset S0        *)
-(*--------------------------------------------------------------*)
 
 Definition globally_robust_subpartition 
 (p : partition) (d : distance_function) (S0 : subset) : Prop :=
@@ -417,9 +396,8 @@ Definition globally_robust_subpartition
       (forall y, S0 y -> e_ball d x y -> A y).
 
 (*==============================================================*)
-(**            Theorem 4  (Robustness of all Sub-partitions)    *)
+(**            Theorem 4  (Robustness of All Subpartitions)     *)
 (*==============================================================*)
-
 Theorem robustness_of_all_subpartitions :
   forall (p : partition) (d : distance_function),
     (forall S0 : subset, globally_robust_subpartition p d S0) <->
@@ -471,9 +449,11 @@ Proof.
       exact (conj Hball HyS0).
 Qed.
 
-(*==============================================================*)
-(**            Theorem 5  (Distances Limit Global Robustness)   *)
-(*==============================================================*)
+
+(*======================================================================*)
+(** Section 4.2: Existence of a Non-constant Globally Robust Classifier *)
+(*======================================================================*)
+
 Definition nonempty_proper_subset (A : subset) : Prop :=
   (exists x, A x) /\ (exists x, ~ A x).
 
@@ -556,14 +536,6 @@ Proof.
     lia.
 Qed.
 
-(* --------------------------------------------------------------------- *)
-(**  If every cross-pair is farther than ε in **both** directions,
-      the two-block split [A ; ¬A] is an ε-separable partition.         *)
-(* --------------------------------------------------------------------- *)
-(* --------------------------------------------------------------------- *)
-(**  If every cross-pair is farther than ε in **both** directions,
-      the two-block split [A ; ¬A] is an ε-separable partition.         *)
-(* --------------------------------------------------------------------- *)
 Lemma two_blocks_separated_is_robust
       (d   : distance_function)
       (A   : subset)
@@ -624,8 +596,10 @@ Qed.
 
 
 
-
-Theorem distances_limit_global_robustness
+(*==============================================================*)
+(**            Theorem 5  (Distances Limit Global Robustness)   *)
+(*==============================================================*)
+Theorem global_robustness_implies_distances
   (d : distance_function):
     (forall p : partition,
         globally_robust_partition p d -> trivial_partition p) ->
@@ -667,103 +641,6 @@ Proof.
     (* Contradiction: p is both trivial and non-trivial. *)
     exfalso. apply (Hnontriv Htriv).
 Qed.
-
-Lemma cross_part_far
-      (p : partition) (d : distance_function) :
-  globally_robust_partition p d ->
-  forall A B a b,
-    In A (parts p) -> In B (parts p) -> A <> B ->
-    A a -> B b ->
-    e < d a b /\ e < d b a.
-Proof.
-  intros Hglob A B a b HA HB HAB Ha Hb.
-  pose proof (Hglob a) as [A' [HA'parts HballA]].
-  pose proof (Hglob b) as [B' [HB'parts HballB]].
-
-  (* A’ and B’ are the blocks delivered by global robustness     *)
-  (* for the two witnesses a and b; use disjointness to show     *)
-  (* that A’ = A and B’ = B, then rule out d ≤ ε in either dir.  *)
-    (* A' contains a (distance 0 ≤ ε)                                  *)
-  assert (Ha' : A' a).
-  { apply (HballA a). unfold e_ball.
-    rewrite distance_function_refl. apply le_0_n. }
-
-  (* B' contains b                                                   *)
-  assert (Hb' : B' b).
-  { apply (HballB b). unfold e_ball.
-    rewrite distance_function_refl. apply le_0_n. }
-
-  (* ---------- prove A' = A --------------------------------------- *)
-  assert (A' = A) as HeqA.
-  { destruct (classic (A' = A)) as [Heq|Hneq]; [exact Heq|].
-    exfalso.
-    apply (parts_disjoint p A' A HA'parts HA Hneq a); split; assumption. }
-
-  (* ---------- prove B' = B --------------------------------------- *)
-  assert (B' = B) as HeqB.
-  { destruct (classic (B' = B)) as [Heq|Hneq]; [exact Heq|].
-    exfalso.
-    apply (parts_disjoint p B' B HB'parts HB Hneq b); split; assumption. }
-
-  subst A' B'.
-
-  (* ---------- now rule out each ≤ ε case ------------------------- *)
-  split.
-  - (* 1️⃣  assume d a b ≤ ε and derive a contradiction *)
-    apply Nat.nle_gt.                      (* goal: ~(d a b ≤ e) *)
-    intros Hle.                            (* Hle : d a b ≤ e    *)
-    pose proof (HballB a Hle) as HBa.      (* B  a               *)
-    apply (parts_disjoint p A B HA HB HAB a); split; [ exact Ha | exact HBa ].
-
-  - (* 2️⃣  assume d b a ≤ ε and derive a contradiction *)
-    apply Nat.nle_gt.                      (* goal: ~(d b a ≤ e) *)
-    intros Hle.                            (* Hle : d b a ≤ e    *)
-    pose proof (HballA b Hle) as HAb.      (* A  b               *)
-    apply (parts_disjoint p A B HA HB HAB b); split; [ exact HAb | exact Hb ].
-Qed.
-
-Lemma nontrivial_partition_gives_part
-      (p : partition) :
-  exists A,
-    In A (parts p) ->
-    ~ trivial_partition p ->
-    nonempty_proper_subset A.
-Proof.
-  destruct p as [parts Hnodup Hnonempty Hcover Hdisjoint].
-  destruct parts as [|A0 rest].
-
-  - (* parts = [] : the premise “In A []” is impossible *)
-    exists (fun _ => False). intros Hin _. inversion Hin.
-
-  - (* parts = A0 :: rest *)
-    exists A0. intros _ Hnot_triv.
-    unfold nonempty_proper_subset. split.
-
-    + (* ∃x, A0 x  (non-empty) *)
-      apply Hnonempty. simpl; left; reflexivity.
-
-    + (* ∃x, ¬ A0 x  (proper) *)
-      destruct rest as [|B rest'].
-      * (* only one block ⇒ partition is [A0] ⇒ contradicts non-triviality *)
-        exfalso. apply Hnot_triv. exists A0. reflexivity.
-      * (* there is a second block B *)
-        assert (HB_in : In B (A0 :: B :: rest')) by (simpl; right; left; reflexivity).
-        destruct (Hnonempty _ HB_in) as [x HBx].      (* pick x ∈ B *)
-
-
-        (* A0 and B are syntactically different – a consequence of [NoDup]. *)
-        assert (A0 <> B) as Hneq.
-        intro Heq. subst B.
-        inversion Hnodup as [| Heq Hneq Hnotin _]; simpl in Hnotin.
-        assert (Hin : In A0 (A0 :: rest')) by (left; reflexivity).
-        apply Hnotin; left; reflexivity.
-        inversion Hnodup as [| ? ? Hnotin _]; subst.
-        pose proof (Hdisjoint A0 B (or_introl eq_refl) HB_in Hneq x) as Hnot_both.
-        exists x.
-        auto.
-Qed.
-
-
 
 Theorem global_robustness_limit_distances
         (d : distance_function) :
@@ -901,7 +778,10 @@ Qed.
 
 
 
-Theorem global_robustness_equals_distances (d : distance_function):
+(*==============================================================*)
+(**            Theorem 5  (Distances Limit Global Robustness)   *)
+(*==============================================================*)
+Theorem distances_limit_global_robustness (d : distance_function):
   (inhabited S) ->
     (forall p : partition,
         globally_robust_partition p d -> trivial_partition p) <->
@@ -912,7 +792,7 @@ Theorem global_robustness_equals_distances (d : distance_function):
 Proof.
 intros *; 
 split.
-- apply distances_limit_global_robustness; assumption. 
+- apply global_robustness_implies_distances; assumption. 
 - apply global_robustness_limit_distances; assumption.
 Qed.
 
@@ -923,36 +803,11 @@ Qed.
 
 
 
-(*
-  Precision Gap in Ordered Metric Sets
-  ====================================
-  This file formalises the material contained in Section "Precision Gap in
-  Ordered Metric Sets" (see the accompanying LaTeX excerpt).  We proceed in
-  three phases:
 
-  1.  *Abstract setting.*  A *finite totally ordered set* is represented by a
-      list `carrier : list A` whose elements are pairwise distinct and whose
-      order, given by a binary relation `lt : A -> A -> Prop`, is total and
-      strict.  The list is regarded as a *full enumeration* of the set; any
-      `x : A` that belongs to the set appears exactly once in `carrier`.
+(*==============================================================*)
+(** Section 4.3: Global Robustness in Computer Arithmetic       *)
+(*==============================================================*)
 
-  2.  *Metric structure.*  A distance function `d : A -> A -> R` is attached to
-      the set.  The only property of `d` needed for the development is
-      non-negativity.
-
-  3.  *Precision gap.*  The *successor* relation is defined via adjacency inside
-      `carrier`.  The *precision gap* is the maximum distance between any two
-      successive elements.  We finally prove the *Precision-Gap Constraint*:
-      every non-empty proper subset of the carrier has a boundary element whose
-      distance to its complement is bounded by the precision gap.
-
-  The formal proofs follow the textbook argument given in the LaTeX source.
-  They rely only on elementary facts from the standard library
-  (`List`, `Reals`, `Lia`).
-*)
-
-
-  (** * Abstract setting *)
   (** We work with a strict order [lt]. *)
   Variable lt : S -> S -> Prop.
   Variable d : distance_function.
@@ -960,11 +815,17 @@ Qed.
   Definition ge (x y : S) : Prop := lt y x \/ x = y.
   Definition le (x y : S) : Prop := lt x y \/ x = y.
 
-    Definition is_maximum (x : S) : Prop :=
+  Definition is_maximum (x : S) : Prop :=
     forall y : S, ge x y.
+
+  Definition is_maximum_in (x : S) (A : S -> Prop) : Prop :=
+    A x /\ (forall y : S, A y -> ge x y).
 
   Definition is_minimum (x : S) : Prop :=
     forall y : S, ge y x.
+
+  Definition is_minimum_in (x : S) (A : S -> Prop) : Prop :=
+    A x /\ (forall y : S, A y -> le x y).
 
 
 
@@ -1000,6 +861,89 @@ Qed.
     | right _ => false
     end.
 
+
+
+Lemma existsb_forall {A} (p : A -> bool) (l : list A) :
+  existsb p l = false <-> forall z, In z l -> p z = false.
+Proof.
+  induction l as [| a l IH]; simpl.
+  - (* l = [] *)
+    split.
+    + intros H z Hf. exfalso. auto.
+    + intros _. reflexivity.
+  - (* l = a :: l *)
+    destruct (p a) eqn:Ha; simpl.
+    + (* p a = true *)
+      split.
+      * (* → *) discriminate.
+      * (* ← *) intros Hb.
+        assert (p a = false) as Hfa.
+        { apply Hb. left. reflexivity. }
+        congruence.
+    + (* p a = false *)
+      rewrite IH.
+      split. 
+      intros H z [-> | H_in].
+      * (* z = a *)    assumption.
+      * (* z ∈ l *)   apply H. assumption.
+      * (* → *)       intros H z Hz.
+          apply H.
+          right; assumption.
+Qed.
+
+
+Lemma if_false_else_true_true (b : bool) :
+  (if b then false else true) = true <-> b = false.
+Proof. destruct b; simpl; split; congruence. Qed.
+
+Lemma succb_find_false x y :
+  existsb
+    (fun z =>
+      if lt_dec x z
+      then if lt_dec z y then true else false
+      else false)
+    elems = false
+  <-> forall z, In z elems -> ~ (lt x z /\ lt z y).
+Proof.
+  rewrite existsb_forall.
+  split; intros H z Hz; specialize (H z Hz).
+  destruct (lt_dec x z) as [Hxz|Hnx]; destruct (lt_dec z y) as [Hzy|Hnzy]; simpl in H.
+  - (* x<z, z<y *) discriminate H.
+  - (* x<z, ¬z<y *) intros [ _ Hzy ]. now apply Hnzy.
+  - (* ¬x<z, z<y *) intros [ Hxz _ ]. now apply Hnx.
+  - (* ¬x<z, ¬z<y *) intros [Hxz' _]. now apply Hnzy.
+  - destruct (lt_dec x z) as [Hxz|Hnxz].
+    + (* case x<z *)
+  destruct (lt_dec z y) as [Hzy|Hnzy].
+  * (* case z<y too ⇒ bool = true, but H forbids it *)
+    exfalso; apply H; split; assumption.
+  * (* case ¬ z<y ⇒ bool = false *)
+    simpl; reflexivity.
++ (* case ¬ x<z ⇒ bool = false *)
+  simpl; reflexivity.
+Qed.
+
+Lemma succb_correct x y :
+  succb x y = true <-> is_successor x y.
+Proof.
+  unfold succb, is_successor.
+  destruct (lt_dec x y) as [Hxy|Hnxy]; simpl.
+  - (* x<y: succb = if existsb _ elems then false else true *)
+    rewrite if_false_else_true_true.
+    rewrite succb_find_false.
+    split.
+    + intros NoMiddle.
+      split.
+      * exact Hxy.
+      * intros z. apply NoMiddle, elems_complete.
+    + intros [Hxy' Hno].
+      intros z Hin.
+      apply Hno.
+  - (* ¬ x<y: succb = false, is_successor x y = False *)
+    simpl; split.
+    + discriminate.
+    + intros []. auto.
+Qed.
 
  (** 4) list all pairs *)
   Definition all_pairs : list (S * S) :=
@@ -1045,40 +989,468 @@ Definition betw (x y : S) : list S :=
          elems.
 
 
-
-
-Lemma length_split {A} (x : A) (l1 l2 : list A) :
-  length (l1 ++ x :: l2) = Nat.succ (length (l1 ++ l2)).
+Lemma list_has_unique_max
+      (l : list S) (Hne : l <> []) :
+  exists! m, In m l /\ (forall y, In y l -> ge m y).
 Proof.
-  (* rewrite app_length on *both* the LHS and the RHS *)
-  rewrite !app_length.
-  (* now the goal is
-       length l1 + length (x::l2) = S (length l1 + length l2)
-     and [simpl] will reduce the length on the LHS to
-       length l1 + S (length l2) = S (length l1 + length l2)
-  *)
-  simpl.
-  (* now we have “_ + S _ = …”, so plus_n_Sm applies *)
-  rewrite plus_n_Sm.
-  reflexivity.
+  (* classical choice will come in handy when we compare two candidates *)
+  assert (Hcmp := lt_total).
+
+  (* we do induction from the right with the *standard* rev_ind *)
+  induction l using rev_ind.
+  - contradiction.                       (* base [] impossible (Hne) *)
+  - destruct l as [| h t].
+    + (* singleton list [x] *)
+      exists x; split.
+      * split; [now left | intros y [<-|[]]; right; reflexivity].
+      * intros m'.
+        intros [Hin _].
+        inversion Hin; subst; [auto | tauto].
+    + (* proper snoc t ++ [x]; IH gives a unique max m for t --------- *)
+      destruct IHl as [m [[Hm_in Hm_ge] Hm_unique]].
+      { intro Ht_nil. apply Hne. now rewrite Ht_nil. }
+
+      (* compare the old maximum [m] with the new element [x] *)
+      destruct (Hcmp m x) as [Heq | [Hlt_mx | Hlt_xm]].
+
+      * (* m = x : keep m (== x) as unique max ----------------------- *)
+        subst. exists x; split.
+        -- split; [now apply in_or_app; right; left| ].
+           intros y Hy. apply Hm_ge.
+          apply in_app_iff in Hy as [Hin_ht | Hin_x].
+          exact Hin_ht.
+          destruct Hin_x as [Hyx | []].
+          rewrite <- Hyx.
+          exact Hm_in.
+        -- intros m' [Hin Hge].
+          apply in_app_iff in Hin as [Hin_ht | Hin_x].
+          ++ (* Case: m' ∈ h :: t *)
+            apply Hm_unique.
+            split.
+            ** exact Hin_ht.
+            ** intros y Hy. apply Hge. apply in_or_app. now left.
+          ++ (* Case: m' = x *)
+            destruct Hin_x as [Heq | Hin_nil]. (* In [x] is just m' = x or impossible *)
+            ** exact Heq.                      (* m' = x ⟹ done *)
+            ** contradiction.                  (* [] ⟹ impossible *)
+
+
+
+
+      * (* m < x : x becomes the new maximum ------------------------ *)
+        exists x; split.
+        -- split.
+           ++ apply in_or_app. right. simpl. left. auto. 
+           ++ intros y Hy.
+              destruct (in_app_or _ _ _ Hy) as [Hy_in_t | [Hy_eq | []] ].
+              ** (* y in t : compare via m ≤ y ≤ x -------------------- *)
+                 specialize (Hm_ge y Hy_in_t).
+                unfold ge in Hm_ge.
+                destruct Hm_ge as [Hlym | Heqm].
+                 left. apply lt_trans with (y:=m); assumption.
+                 subst y.
+                unfold ge. left. exact Hlt_mx.
+              ** (* y = x -------------------------------------------- *)
+                 right; subst; reflexivity.
+        -- intros m' [Hin Hge].
+            rewrite in_app_iff in Hin; simpl in Hin.
+            destruct Hin as [Hin | [->|?]].
+          ++ (* m' in old list *)
+            assert( Heq : m = m').
+            { apply Hm_unique; split; auto.
+              intros y Hy; apply Hge; apply in_or_app; left; exact Hy. }
+            subst m'.
+            assert( Hlt : lt m x)     by apply Hlt_mx.
+            assert(Hge' : ge m x)    by (apply Hge; apply in_or_app; right; simpl; auto).
+            destruct Hge'.
+            ** exfalso.
+                assert (lt x x) by (apply lt_trans with m; assumption).
+                apply lt_irrefl in H0. exact H0.
+            ** symmetry. exact H.
+          ++ auto.
+          ++ exfalso. exact H.
+      * (* x < m : keep old maximum m ------------------------------- *)
+        exists m; split.
+        -- split; [apply in_or_app; left; assumption| ].
+           intros y Hy. destruct (in_app_or _ _ _ Hy) as [Hy_in_t | [Hy_eq|[]] ].
+           ++ apply Hm_ge. exact Hy_in_t.
+           ++ subst. left; assumption.
+        -- intros m' [Hin Hge]. apply Hm_unique; split. 
+          ++ rewrite in_app_iff in Hin; simpl in Hin.
+            destruct Hin as [Hin | [Hx | []]].
+            ** exact Hin.                         (* already in (h :: t) *)
+            ** subst m'.                          (* m' = x, derive contradiction *)
+              assert (G : ge x m) by (apply Hge; apply in_or_app; left; exact Hm_in).
+              destruct G as [Hlt | Heq].
+              --- (* lt m x contradicts lt x m *)
+                exfalso. 
+                assert (lt x x) by (apply lt_trans with m; assumption).
+                apply lt_irrefl in H. exact H.
+              --- (* x = m contradicts lt x m *)
+                subst. 
+                exfalso. 
+                apply lt_irrefl in Hlt_xm. exact Hlt_xm.
+          ++ intros y Hy.
+              apply Hge.                 (* it suffices to show In y ((h :: t) ++ [x]) *)
+              apply in_or_app.           (* In y (l1 ++ l2) ↔ In y l1 \/ In y l2 *)
+              left.                      (* pick the left disjunct: In y (h :: t) *)
+              exact Hy.
 Qed.
 
 
+Lemma list_has_unique_min
+      (l : list S) (Hne : l <> []) :
+  exists! m, In m l /\ (forall y, In y l -> le m y).
+Proof.
+  (* totality of < lets us compare two candidates *)
+  assert (Hcmp := lt_total).
+
+  (* right-to-left induction with the standard rev_ind *)
+  induction l using rev_ind.
+  - contradiction.                                   (* base [] impossible (Hne) *)
+  - destruct l as [| h t].
+    + (* singleton list [x] ----------------------------------------------------- *)
+      exists x; split.
+      * split; [now left | intros y [<-|[]]; right; reflexivity].
+      * intros m' [Hin _]. inversion Hin; subst; [auto | tauto].
+
+    + (* proper snoc t ++ [x] ; IH gives a unique min m for t ------------------ *)
+      destruct IHl as [m [[Hm_in Hm_le] Hm_unique]].
+      { intro Ht_nil. apply Hne. now rewrite Ht_nil. }
+
+      (* compare the old minimum [m] with the new element [x] *)
+      destruct (Hcmp m x) as [Heq | [Hlt_mx | Hlt_xm]].
+
+      * (* m = x : keep x (== m) as unique min --------------------------------- *)
+        subst. exists x; split.
+        -- split; [now apply in_or_app; right; left| ].
+           intros y Hy. apply in_app_iff in Hy as [Hy_t | Hy_x].
+           ++ apply Hm_le; exact Hy_t.
+           ++ destruct Hy_x as [<-|[]]; right; reflexivity.
+        -- intros m' [Hin Hle].
+           apply in_app_iff in Hin as [Hin_t | Hin_x].
+           ++ (* m' ∈ h :: t *)
+              apply Hm_unique.
+              split; [exact Hin_t|].
+              intros y Hy. apply Hle. apply in_or_app; now left.
+           ++ (* m' = x *)
+              destruct Hin_x as [->|[]]; reflexivity.
+
+      * (* m < x : keep m as unique min --------------------------------------- *)
+        exists m; split.
+        -- split; [apply in_or_app; left; exact Hm_in| ].
+           intros y Hy.
+           destruct (in_app_or _ _ _ Hy) as [Hy_t | [Hy_eq|[]]].
+           ++ apply Hm_le; exact Hy_t.
+           ++ subst; left; exact Hlt_mx.
+        -- intros m' [Hin Hle].
+           apply Hm_unique; split.
+           ++ rewrite in_app_iff in Hin; simpl in Hin.
+              destruct Hin as [Hin_t | [Hx|[]]].
+              ** exact Hin_t.
+              ** subst m'. (* m' = x, contradiction with m < x ≤ m' *)
+                 assert (le x m) by (apply Hle; apply in_or_app; left; exact Hm_in).
+                 destruct H as [Hlt_xm'|Heq']; [|subst; now apply lt_irrefl in Hlt_mx].
+                 exfalso. apply lt_irrefl with m.
+                 apply lt_trans with x; assumption.
+           ++ intros y Hy. apply Hle. apply in_or_app; left; exact Hy.
+
+      * (* x < m : x becomes the new minimum ---------------------------------- *)
+        exists x; split.
+        -- split.
+           ++ apply in_or_app; right; simpl; left; auto.
+           ++ intros y Hy.
+              destruct (in_app_or _ _ _ Hy) as [Hy_t | [Hy_eq|[]]].
+              ** (* y ∈ t : derive lt x y from x < m ≤ y *)
+                 specialize (Hm_le y Hy_t) as Hle_my.
+                 destruct Hle_my as [Hlt_my|Heq_my].
+                 --- left. apply lt_trans with m; assumption.
+                 --- subst; left; exact Hlt_xm.
+              ** right; subst; reflexivity.
+        -- intros m' [Hin Hle].
+           rewrite in_app_iff in Hin; simpl in Hin.
+           destruct Hin as [Hin_t | [->|[]]].
+           ++ (* m' ∈ h :: t *)
+              assert (m = m').
+              { apply Hm_unique; split; auto.
+                intros y Hy. apply Hle. apply in_or_app; left; exact Hy. }
+              subst m'.
+              assert (le m x) by (apply Hle; apply in_or_app; right; simpl; auto).
+              destruct H as [Hlt_mx|Heq_mx].
+              ** exfalso. apply lt_irrefl with x.
+                 apply lt_trans with m; [exact Hlt_xm|exact Hlt_mx].
+              ** subst; now apply lt_irrefl in Hlt_xm.
+           ++ reflexivity.
+Qed.
+
+Lemma subset_has_unique_maximum :
+  forall (A : S -> Prop),
+    (exists a, A a) ->
+    exists! m, is_maximum_in m A.
+Proof.
+  intros A [a0 Ha0].
+
+  (* filter the global enumeration to keep only the elements of A *)
+  pose (sub :=
+          filter (fun x => if excluded_middle_informative (A x) then true else false)
+                 elems).
+
+  (* [sub] really enumerates exactly the elements of [A] ---------------------*)
+  assert (Hsub_spec : forall x, In x sub <-> A x).
+  { intro x. unfold sub.
+    rewrite filter_In.
+    split.
+    - intros [_ Hbool]. destruct (excluded_middle_informative (A x)). exact a. exfalso.   discriminate Hbool.
+    - intros HAx. split.
+      + apply elems_complete.
+      + destruct (excluded_middle_informative (A x)); [reflexivity|contradiction].
+  }
+
+  (* [sub] is non-empty because [A] is --------------------------------------*)
+  assert (Hsub_nonempty : sub <> []).
+  { 
+    intro Hnil. rewrite Hnil in *.
+    rewrite <- Hnil in Hsub_spec.
+    specialize (Hsub_spec a0).
+    rewrite <- Hsub_spec in Ha0.
+    rewrite Hnil in Ha0.
+    contradiction.
+  }
+  (* apply the list lemma --------------------------------------------------- *)
+  destruct (list_has_unique_max sub Hsub_nonempty)
+           as [m [[Hm_in Hm_ge] Hm_unique]].
+
+  exists m; split.
+  - (* existence ----------------------------------------------------------- *)
+    unfold is_maximum_in.
+    split.
+    + apply (proj1 (Hsub_spec m)); assumption.
+    + intros y HyA. apply Hm_ge, (proj2 (Hsub_spec y)); assumption.
+
+  - (* uniqueness ----------------------------------------------------------- *)
+    intros m' [Hm'A Hm'_ge].
+    apply Hm_unique. split.
+    + apply (proj2 (Hsub_spec m')); assumption.
+    + intros y Hy_in_sub.
+      apply Hm'_ge, (proj1 (Hsub_spec y)); assumption.
+Qed.
 
 
+Lemma subset_has_unique_minimum :
+  forall (A : S -> Prop),
+    (exists a, A a) ->
+    exists! m, is_minimum_in m A.
+Proof.
+  intros A [a0 Ha0].
 
-  
+  (* filter the global enumeration to keep only the elements of A *)
+  pose (sub :=
+          filter (fun x => if excluded_middle_informative (A x) then true else false)
+                 elems).
+
+  (* [sub] really enumerates exactly the elements of [A] ---------------------*)
+  assert (Hsub_spec : forall x, In x sub <-> A x).
+  { intro x. unfold sub.
+    rewrite filter_In.
+    split.
+    - intros [_ Hbool]. destruct (excluded_middle_informative (A x)). exact a. exfalso.   discriminate Hbool.
+    - intros HAx. split.
+      + apply elems_complete.
+      + destruct (excluded_middle_informative (A x)); [reflexivity|contradiction].
+  }
+
+  (* [sub] is non-empty because [A] is --------------------------------------*)
+  assert (Hsub_nonempty : sub <> []).
+  { 
+    intro Hnil. rewrite Hnil in *.
+    rewrite <- Hnil in Hsub_spec.
+    specialize (Hsub_spec a0).
+    rewrite <- Hsub_spec in Ha0.
+    rewrite Hnil in Ha0.
+    contradiction.
+  }
+  (* apply the list lemma --------------------------------------------------- *)
+  destruct (list_has_unique_min sub Hsub_nonempty)
+           as [m [[Hm_in Hm_le] Hm_unique]].
+
+  exists m; split.
+  - (* existence ----------------------------------------------------------- *)
+    unfold is_maximum_in.
+    split.
+    + apply (proj1 (Hsub_spec m)); assumption.
+    + intros y HyA. apply Hm_le, (proj2 (Hsub_spec y)); assumption.
+
+  - (* uniqueness ----------------------------------------------------------- *)
+    intros m' [Hm'A Hm'_le].
+    apply Hm_unique. split.
+    + apply (proj2 (Hsub_spec m')); assumption.
+    + intros y Hy_in_sub.
+      apply Hm'_le, (proj1 (Hsub_spec y)); assumption.
+Qed.
+
+(** A minimum of a subset that is *not* a global minimum of [S]
+    has an immediate predecessor in [S]. *)
+Lemma non_global_minimum_has_predecessor
+      (A : S -> Prop) (x : S) :
+  is_minimum_in x A      (* x is the minimum of the subset A *)
+  -> ~ is_minimum x      (* …but x is NOT the minimum of the whole set *)
+  -> exists y, is_successor y x.
+Proof.
+  intros HminA Hnot_min.
+
+  (* --- 1.  There exists some y with [lt y x] ------------------------------- *)
+  assert (Hex_lt : exists y, lt y x).
+  { (* from  ¬(∀y, ge y x)  we get a witness [y0] with ¬ge y0 x            *)
+    apply not_all_ex_not in Hnot_min as [y0 Hny].
+    (* Use totality to decide the relation between y0 and x *)
+    destruct (lt_total y0 x) as [Heq | [Hlt_y0x | Hlt_xy0]].
+    - (* case y0 = x  contradicts  ¬ge y0 x                                *)
+      unfold ge in Hny.
+      assert (False) as Hf.
+      {
+        rewrite Heq in Hny. (* Substitute y0 with x *)
+        apply Hny.
+        right. reflexivity. (* y0 = x *)
+      }
+      contradiction.
+    - (* case y0 < x : that is what we need                                *)
+      now exists y0.
+    - (* case x < y0 ⇒ ge y0 x holds via left disjunct, contradiction      *)
+      unfold ge in Hny.
+      exfalso.
+      contradict Hny.
+      left.
+      apply Hlt_xy0.
+  }
+
+  (* --- 2.  Consider the set [B] of elements *below* [x] ------------------- *)
+  set (B := fun y : S => lt y x).
+
+  (* [B] is non-empty *)
+  destruct Hex_lt as [y0 Hy0].
+  assert (HBne : exists y, B y) by (exists y0; exact Hy0).
+
+  (* --- 3.  Finite-set lemma ⇒ [p] is the unique maximum of [B] ----------- *)
+  destruct (subset_has_unique_maximum B HBne)
+           as [p [[Hpltx Hmax] _]].
+  (*   Hpltx : lt p x
+       Hmax  : forall z, B z -> ge p z  (i.e. p ≥ every z < x) *)
+
+  (* --- 4.  Show that [p] is an immediate predecessor of [x] -------------- *)
+  exists p. unfold is_successor. split.
+  - exact Hpltx.
+  - intros z [Hpz Hzx].                 (* lt p z ∧ lt z x *)
+    (* Since z < x, z ∈ B *)
+    assert (HBz : B z) by exact Hzx.
+    specialize (Hmax z HBz).            (* p ≥ z *)
+    unfold ge in Hmax.                  (*  lt z p  ∨  p = z  *)
+    destruct Hmax as [Hlt_zp | Heq_pz].
+    + (* lt z p contradicts lt p z via transitivity/irreflexivity *)
+      exfalso.
+      assert (lt p p) by (eapply lt_trans; [exact Hpz|exact Hlt_zp]).
+      now apply lt_irrefl in H.
+    + (* p = z contradicts lt p z *)
+      subst. now apply lt_irrefl in Hpz.
+Qed.
+
 Lemma boundary_pair_exists :
-    exists x x',
-      In x elems /\ In x' elems /\
-      ((In x' S' /\ ~ In x S') \/ (In x S' /\ ~ In x' S')) /\
-      (succb x x' = true \/ succb x' x = true).
+  exists x x',
+    In x elems /\ In x' elems /\
+    ((In x' S' /\ ~ In x S') \/ (In x S' /\ ~ In x' S')) /\
+    (is_successor x x' \/ is_successor x' x).
 Proof.
-(* TODO *)
+  (* -------- 1.  the unique minimum m of S' ------------------------------ *)
+  set (A := fun z : S => In z S').
+  destruct S'_nonempty as [s0 Hs0].
+  destruct (subset_has_unique_minimum A (ex_intro _ s0 Hs0))
+    as [m [[Hm_inS Hm_min] _]].
+
+  (* -------- 2.  Case analysis on m being a global minimum --------------- *)
+  destruct (classic (is_minimum m)) as [Hglob_min | Hnot_min_m].
+
+  (* ===== CASE 1 :  m IS the global minimum ============================== *)
+  - (* Work with the complement C := S \ S' ----------------------------- *)
+    set (C := fun z : S => ~ In z S').
+    destruct S'_proper as [c0 [_ Hc0_notS]].
+    destruct (subset_has_unique_minimum C (ex_intro _ c0 Hc0_notS))
+      as [mc [[Hmc_notS Hmc_min] _]].
+
+    (* m < mc :   mc is strictly above the global minimum m ------------- *)
+    assert (Hlt_m_mc : lt m mc).
+    { destruct (lt_total m mc) as [Heq | [Hlt | Hgt]].
+      - subst; contradiction.
+      - exact Hlt.
+      - (* mc < m contradicts global minimality of m *)
+        unfold is_minimum in Hglob_min.
+        specialize (Hglob_min mc).
+        unfold ge in Hglob_min.
+        destruct Hglob_min as [Hlt'|Heq']; [|subst; contradiction].
+        exfalso.                       (* obtain lt mc mc *)
+        assert (lt mc mc) by (eapply lt_trans; [exact Hgt|exact Hlt']).
+        now apply (lt_irrefl mc) in H. }
+
+    (* mc is *not* a global minimum ------------------------------------- *)
+    assert (Hnot_min_mc : ~ is_minimum mc).
+    { intro Hmin_mc.
+      unfold is_minimum in Hmin_mc.
+      specialize (Hmin_mc m).
+      unfold ge in Hmin_mc.
+      destruct Hmin_mc as [Hlt|Heq]; [|subst;contradiction].
+      exfalso.
+      assert (lt mc mc) by (eapply lt_trans; [exact Hlt|exact Hlt_m_mc]).
+      now apply (lt_irrefl mc) in H. }
+
+    (* mc’s predecessor p lies in S' ------------------------------------ *)
+    assert (HminC : is_minimum_in mc C) by (split; assumption).
+    destruct (non_global_minimum_has_predecessor C mc HminC Hnot_min_mc)
+      as [p Hp_succ].                              (* is_successor p mc *)
+
+    assert (Hp_inS : In p S').
+    { destruct Hp_succ as [Hlt_p_mc _].
+      destruct (classic (In p S')) as [HpS|Hp_notS]; [exact HpS|].
+      (* p ∈ C would contradict minimality of mc *)
+      specialize (Hmc_min p Hp_notS) as Hle_mc_p.
+      destruct Hle_mc_p as [Hlt_mc_p|Heq].
+      - exfalso.
+        assert (lt mc mc) by (eapply lt_trans; [exact Hlt_mc_p|exact Hlt_p_mc]).
+        now apply (lt_irrefl mc) in H.
+      - exfalso. contradict Hlt_p_mc. 
+        rewrite <- Heq.
+        apply lt_irrefl.
+    }
+
+    (* Produce the boundary pair (p, mc) -------------------------------- *)
+    exists p, mc.
+    repeat split.
+    + apply elems_complete.
+    + apply elems_complete.
+    + right; split; assumption.            (* p ∈ S',  mc ∉ S' *)
+    + left; exact Hp_succ.                 (* is_successor p mc *)
+
+  (* ===== CASE 2 :  m is NOT the global minimum ========================= *)
+  - (* m has a predecessor p lying outside S' --------------------------- *)
+    assert (HminA : is_minimum_in m A) by (split; assumption).
+    destruct (non_global_minimum_has_predecessor A m HminA Hnot_min_m)
+      as [p Hp_succ].                              (* is_successor p m *)
+
+    assert (Hp_notS : ~ In p S').
+    { intro HpS.
+      destruct Hp_succ as [Hlt_p_m _].
+      specialize (Hm_min p HpS) as Hle_m_p.
+      destruct Hle_m_p as [Hlt_m_p|Heq].
+      - exfalso.
+        assert (lt p p) by (eapply lt_trans; [exact Hlt_p_m|exact Hlt_m_p]).
+        now apply (lt_irrefl p) in H.
+      - subst; now apply (lt_irrefl p) in Hlt_p_m. }
+
+    (* Produce the boundary pair (p, m) --------------------------------- *)
+    exists p, m.
+    repeat split.
+    + apply elems_complete.
+    + apply elems_complete.
+    + left;  split; assumption.            (* m ∈ S',  p ∉ S' *)
+    + left; exact Hp_succ.                 (* is_successor p m *)
 Qed.
-
-
-
 
 Lemma max_list_ge (l : list nat) (m : nat) :
   In m l -> m <= max_list l.
@@ -1097,7 +1469,6 @@ Proof.
       * (* and max_list t ≤ max h (max_list t) = max_list (h::t) *)
         destruct (max_list t); simpl; lia.
 Qed.
-
 
 Lemma in_map_fst {A B} (f : A -> B) (x:A) (l:list A) :
   In x l -> In (f x) (map f l).
@@ -1119,14 +1490,9 @@ Proof.
 Qed.
 
 
-
-Lemma in_filter_pair {A} (P : A -> bool) (l : list A) x :
-  In x (filter P l) -> P x = true.
-Proof.
-  intros H. apply filter_In in H. destruct H as [_ H2]. exact H2.
-Qed.
-
-
+(*==============================================================*)
+(**            Theorem 6  (Precision Gap Constraint)            *)
+(*==============================================================*)
 Theorem precision_gap_constraint :
   exists x x',
     In x elems /\ In x' elems /\
@@ -1144,8 +1510,15 @@ Proof.
     split.
     - apply in_flat_map. exists x. split; [exact Hx|].
       apply in_map. exact Hx'.
-    - destruct Hsucc as [Hs|Hs]; rewrite Hs; simpl; auto.
-      apply orb_true_r.
+    - destruct Hsucc as [Hs|Hs]; simpl; auto. 
+      + apply succb_correct in Hs.
+        rewrite Bool.orb_true_iff.
+        left.
+        exact Hs.
+      + rewrite Bool.orb_true_iff.
+        apply succb_correct in Hs.
+        right.
+        exact Hs.
   }
 
   (* 3. So its distance is in gaps, hence ≤ precision_gap *)
@@ -1155,14 +1528,8 @@ Proof.
   exists x, x'. repeat (split; try assumption).
 Qed.
 
-
-
-
+Arguments global_robustness_implies_distances.
+Arguments precision_gap_constraint : assert.
 
 End Paper.
 
-
-
-
-Arguments precision_gap_constraint {S e} _.
-  
